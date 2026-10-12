@@ -8,7 +8,9 @@ import 'room_dashboard_page.dart';
 import 'room_entry_pages.dart';
 
 class RoomsPage extends StatefulWidget {
-  const RoomsPage({super.key});
+  const RoomsPage({required this.onSignOut, super.key});
+
+  final Future<void> Function() onSignOut;
 
   @override
   State<RoomsPage> createState() => _RoomsPageState();
@@ -23,7 +25,7 @@ class _RoomsPageState extends State<RoomsPage> {
       0 => _buildRooms(),
       1 => const HistoryPage(),
       2 => const StatisticsPage(),
-      _ => const ProfilePage(),
+      _ => ProfilePage(onSignOut: widget.onSignOut),
     };
 
     return Scaffold(
@@ -83,7 +85,7 @@ class _RoomsPageState extends State<RoomsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'FlowMoney',
+                'PocketTogether',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               SizedBox(height: 1),

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/mock_data.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
-import '../../../auth/presentation/pages/auth_pages.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({super.key});
@@ -470,7 +469,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
 }
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  const ProfilePage({required this.onSignOut, super.key});
+
+  final Future<void> Function() onSignOut;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -603,11 +604,15 @@ class _ProfilePageState extends State<ProfilePage> {
                       icon: Icons.logout_rounded,
                       title: 'Sign out',
                       destructive: true,
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const LoginPage(),
-                        ),
-                      ),
+                      onTap: () async {
+                        try {
+                          await widget.onSignOut();
+                        } catch (_) {
+                          if (context.mounted) {
+                            _message(context, 'Unable to sign out. Try again.');
+                          }
+                        }
+                      },
                     ),
                   ],
                 ),

@@ -175,3 +175,7 @@ features/
         └── widgets/
             ├── expense_card.dart
             └── category_bottom_sheet.dart
+
+Each feature keeps its Cubit under `presentation/cubit/`. Auth uses its Cubit
+to call `AuthRepository` and emit loading, success, and failure states. Other
+feature Cubits should be added as their repository-backed workflows are built.

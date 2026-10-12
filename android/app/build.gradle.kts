@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ffta"
+    namespace = "com.example.pockettogether"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

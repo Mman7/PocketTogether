@@ -1,4 +1,4 @@
-# ffta
+# PocketTogether
 
 A new Flutter project.
 

@@ -1,27 +1,99 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/data/auth_repository.dart';
+import '../features/auth/data/firebase_auth_repository.dart';
+import '../features/auth/presentation/cubit/auth_cubit.dart';
+import '../features/auth/presentation/pages/auth_pages.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
 import 'theme/app_theme.dart';
 
-class FlowMoneyApp extends StatelessWidget {
-  const FlowMoneyApp({super.key});
+class PocketTogetherApp extends StatefulWidget {
+  const PocketTogetherApp({this.authRepository, super.key});
+
+  final AuthRepository? authRepository;
+
+  @override
+  State<PocketTogetherApp> createState() => _PocketTogetherAppState();
+}
+
+class _PocketTogetherAppState extends State<PocketTogetherApp> {
+  late final AuthRepository _authRepository;
+  late final _AuthStateRefresh _authStateRefresh;
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _authRepository =
+        widget.authRepository ?? FirebaseAuthRepository(FirebaseAuth.instance);
+    _authStateRefresh = _AuthStateRefresh(_authRepository.authStateChanges);
+    _router = GoRouter(
+      initialLocation: '/rooms',
+      refreshListenable: _authStateRefresh,
+      redirect: (context, state) {
+        final isAuthRoute = switch (state.matchedLocation) {
+          '/login' || '/register' || '/forgot-password' => true,
+          _ => false,
+        };
+        if (!_authRepository.isSignedIn && !isAuthRoute) return '/login';
+        if (_authRepository.isSignedIn && isAuthRoute) return '/rooms';
+        return null;
+      },
+      routes: [
+        GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+        GoRoute(
+          path: '/register',
+          builder: (context, state) => const RegisterPage(),
+        ),
+        GoRoute(
+          path: '/forgot-password',
+          builder: (context, state) => const ForgotPasswordPage(),
+        ),
+        GoRoute(
+          path: '/rooms',
+          builder: (context, state) =>
+              RoomsPage(onSignOut: () => context.read<AuthCubit>().signOut()),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _router.dispose();
+    _authStateRefresh.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'FlowMoney',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      routerConfig: GoRouter(
-        initialLocation: '/rooms',
-        routes: [
-          GoRoute(
-            path: '/rooms',
-            builder: (context, state) => const RoomsPage(),
-          ),
-        ],
+    return BlocProvider(
+      create: (_) => AuthCubit(_authRepository),
+      child: MaterialApp.router(
+        title: 'PocketTogether',
+        debugShowCheckedModeBanner: false,
+        theme: buildAppTheme(),
+        routerConfig: _router,
       ),
     );
+  }
+}
+
+class _AuthStateRefresh extends ChangeNotifier {
+  _AuthStateRefresh(Stream<bool> authStateChanges) {
+    _subscription = authStateChanges.listen((_) => notifyListeners());
+  }
+
+  late final StreamSubscription<bool> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
   }
 }
