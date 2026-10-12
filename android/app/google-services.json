@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "608320306315",
+    "project_id": "ffta-85df5",
+    "storage_bucket": "ffta-85df5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:608320306315:android:ba340f9e65d8b1eae9688e",
+        "android_client_info": {
+          "package_name": "com.example.ffta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAm-7Itc8hBLNp3y3WoSKa7Tpdu3TJzlZ0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
