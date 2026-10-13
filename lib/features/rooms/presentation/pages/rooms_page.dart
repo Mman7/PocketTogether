@@ -1,16 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/mock_data.dart';
+import '../../../auth/models/auth_user.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
-import '../../../overview/presentation/pages/overview_pages.dart';
+import '../../../expenses/presentation/pages/history_page.dart';
+import '../../../profile/data/profile_repository.dart';
+import '../../../profile/presentation/cubit/profile_cubit.dart';
+import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../statistics/presentation/pages/statistics_page.dart';
 import 'room_dashboard_page.dart';
 import 'room_entry_pages.dart';
 
 class RoomsPage extends StatefulWidget {
-  const RoomsPage({required this.onSignOut, super.key});
+  const RoomsPage({
+    required this.onSignOut,
+    required this.profileRepository,
+    this.currentUser,
+    super.key,
+  });
 
   final Future<void> Function() onSignOut;
+  final ProfileRepository profileRepository;
+  final AuthUser? currentUser;
 
   @override
   State<RoomsPage> createState() => _RoomsPageState();
@@ -25,7 +38,15 @@ class _RoomsPageState extends State<RoomsPage> {
       0 => _buildRooms(),
       1 => const HistoryPage(),
       2 => const StatisticsPage(),
-      _ => ProfilePage(onSignOut: widget.onSignOut),
+      _ => BlocProvider(
+        create: (_) =>
+            ProfileCubit(widget.profileRepository)
+              ..load(widget.currentUser?.uid),
+        child: ProfilePage(
+          user: widget.currentUser,
+          onSignOut: widget.onSignOut,
+        ),
+      ),
     };
 
     return Scaffold(

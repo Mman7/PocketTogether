@@ -12,7 +12,12 @@
           "package_name": "com.example.ffta"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "608320306315-5if9th6uaoo5hbpbltnuab3h9rjj46jg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAm-7Itc8hBLNp3y3WoSKa7Tpdu3TJzlZ0"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "608320306315-5if9th6uaoo5hbpbltnuab3h9rjj46jg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../models/auth_user.dart';
 import 'auth_repository.dart';
 
 class FirebaseAuthRepository implements AuthRepository {
@@ -9,6 +10,18 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   bool get isSignedIn => _firebaseAuth.currentUser != null;
+
+  @override
+  AuthUser? get currentUser {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return null;
+    return AuthUser(
+      uid: user.uid,
+      displayName: user.displayName,
+      email: user.email,
+      photoUrl: user.photoURL,
+    );
+  }
 
   @override
   Stream<bool> get authStateChanges =>
@@ -27,17 +40,29 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<void> signInWithGoogle() async {
+    try {
+      await _firebaseAuth.signInWithProvider(GoogleAuthProvider());
+    } on FirebaseAuthException catch (error) {
+      throw AuthFailure(_messageFor(error));
+    }
+  }
+
+  @override
   Future<void> register({
-    required String name,
+    required String displayName,
     required String email,
     required String password,
   }) async {
     try {
+      // Create a new user with the provided email and password.
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      await credential.user?.updateDisplayName(name.trim());
+      final user = credential.user!;
+      // Update the display name for the newly created user.
+      await user.updateDisplayName(displayName.trim());
     } on FirebaseAuthException catch (error) {
       throw AuthFailure(_messageFor(error));
     }
@@ -66,6 +91,7 @@ class FirebaseAuthRepository implements AuthRepository {
     'weak-password' => 'Choose a stronger password and try again.',
     'too-many-requests' => 'Too many attempts. Try again in a few minutes.',
     'network-request-failed' => 'Check your connection and try again.',
+    'operation-not-allowed' => 'Google sign-in is not enabled for this app.',
     _ => 'Something went wrong. Please try again.',
   };
 }

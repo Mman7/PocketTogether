@@ -105,6 +105,21 @@ class _LoginPageState extends State<LoginPage> {
                 : Icons.login_rounded,
             onPressed: authState.status == AuthStatus.loading ? null : _submit,
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: authState.status == AuthStatus.loading
+                  ? null
+                  : _signInWithGoogle,
+              icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
+              label: Text(
+                authState.status == AuthStatus.loading
+                    ? 'Signing in...'
+                    : 'Continue with Google',
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
           Center(
             child: Wrap(
@@ -133,6 +148,9 @@ class _LoginPageState extends State<LoginPage> {
       password: _password.text,
     );
   }
+
+  Future<void> _signInWithGoogle() =>
+      context.read<AuthCubit>().signInWithGoogle();
 }
 
 class RegisterPage extends StatefulWidget {
@@ -340,7 +358,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     await context.read<AuthCubit>().register(
-      name: _name.text,
+      displayName: _name.text,
       email: _email.text,
       password: _password.text,
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,13 +10,20 @@ import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/firebase_auth_repository.dart';
 import '../features/auth/presentation/cubit/auth_cubit.dart';
 import '../features/auth/presentation/pages/auth_pages.dart';
+import '../features/profile/data/firebase_profile_repository.dart';
+import '../features/profile/data/profile_repository.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
 import 'theme/app_theme.dart';
 
 class PocketTogetherApp extends StatefulWidget {
-  const PocketTogetherApp({this.authRepository, super.key});
+  const PocketTogetherApp({
+    this.authRepository,
+    this.profileRepository,
+    super.key,
+  });
 
   final AuthRepository? authRepository;
+  final ProfileRepository? profileRepository;
 
   @override
   State<PocketTogetherApp> createState() => _PocketTogetherAppState();
@@ -23,6 +31,7 @@ class PocketTogetherApp extends StatefulWidget {
 
 class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final AuthRepository _authRepository;
+  late final ProfileRepository _profileRepository;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
 
@@ -31,6 +40,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     super.initState();
     _authRepository =
         widget.authRepository ?? FirebaseAuthRepository(FirebaseAuth.instance);
+    _profileRepository =
+        widget.profileRepository ??
+        FirebaseProfileRepository(FirebaseFirestore.instance);
     _authStateRefresh = _AuthStateRefresh(_authRepository.authStateChanges);
     _router = GoRouter(
       initialLocation: '/rooms',
@@ -56,8 +68,11 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         ),
         GoRoute(
           path: '/rooms',
-          builder: (context, state) =>
-              RoomsPage(onSignOut: () => context.read<AuthCubit>().signOut()),
+          builder: (context, state) => RoomsPage(
+            currentUser: _authRepository.currentUser,
+            profileRepository: _profileRepository,
+            onSignOut: () => context.read<AuthCubit>().signOut(),
+          ),
         ),
       ],
     );
@@ -73,7 +88,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AuthCubit(_authRepository),
+      create: (_) => AuthCubit(_authRepository, _profileRepository),
       child: MaterialApp.router(
         title: 'PocketTogether',
         debugShowCheckedModeBanner: false,

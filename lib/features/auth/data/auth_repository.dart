@@ -1,12 +1,18 @@
+import '../models/auth_user.dart';
+
 abstract interface class AuthRepository {
   bool get isSignedIn;
+
+  AuthUser? get currentUser;
 
   Stream<bool> get authStateChanges;
 
   Future<void> signIn({required String email, required String password});
 
+  Future<void> signInWithGoogle();
+
   Future<void> register({
-    required String name,
+    required String displayName,
     required String email,
     required String password,
   });
