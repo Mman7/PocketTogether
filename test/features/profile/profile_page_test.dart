@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_together/features/profile/model/user.dart';
+import 'package:pocket_together/features/profile/models/user.dart';
 
 import '../../support/test_app.dart';
 
@@ -30,5 +30,31 @@ void main() {
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
+  });
+
+  testWidgets('edits and saves the display name', (tester) async {
+    final harness = TestAppHarness(signedIn: true);
+    harness.profileRepository.profiles['test-user'] = const UserProfile(
+      uid: 'test-user',
+      displayName: 'Alex Profile',
+      email: 'profile@example.com',
+    );
+    await pumpTestApp(tester, harness);
+
+    await tester.tap(find.text('Profile').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Edit profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit display name'), findsOneWidget);
+    await tester.enterText(find.byType(TextFormField), '  Jamie Together  ');
+    await tester.tap(find.text('Save changes'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Jamie Together'), findsOneWidget);
+    expect(
+      harness.profileRepository.profiles['test-user']?.displayName,
+      'Jamie Together',
+    );
   });
 }

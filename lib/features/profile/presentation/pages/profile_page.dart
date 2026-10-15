@@ -3,8 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../auth/models/auth_user.dart';
-import '../../model/user.dart';
+import '../../models/user.dart';
 import '../cubit/profile_cubit.dart';
+import 'edit_display_name_page.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../../shared/presentation/widgets/page_header.dart';
 
@@ -78,10 +79,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                     IconButton(
-                      onPressed: () => _message(
-                        context,
-                        'Profile editing is available in this preview.',
-                      ),
+                      onPressed: widget.user == null
+                          ? null
+                          : () => _editDisplayName(context, displayName),
                       icon: const Icon(Icons.edit_outlined),
                       tooltip: 'Edit profile',
                     ),
@@ -173,6 +173,26 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ],
     );
+  }
+
+  Future<void> _editDisplayName(
+    BuildContext context,
+    String currentName,
+  ) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: context.read<ProfileCubit>(),
+          child: EditDisplayNamePage(
+            uid: widget.user!.uid,
+            initialDisplayName: currentName,
+          ),
+        ),
+      ),
+    );
+    if (updated == true && context.mounted) {
+      _message(context, 'Display name updated.');
+    }
   }
 
   void _chooseCurrency(BuildContext context) {

@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_together/features/profile/models/user.dart';
 
 import '../../support/test_app.dart';
 
 void main() {
+  testWidgets('uses the saved profile name in the rooms greeting', (
+    tester,
+  ) async {
+    final harness = TestAppHarness(signedIn: true);
+    harness.profileRepository.profiles['test-user'] = const UserProfile(
+      uid: 'test-user',
+      displayName: 'Jamie Together',
+      email: 'jamie@example.com',
+    );
+
+    await pumpTestApp(tester, harness);
+
+    expect(find.text('Good evening, Jamie Together 👋'), findsOneWidget);
+  });
+
   testWidgets('launches into rooms and switches main sections', (tester) async {
     await pumpTestApp(tester, TestAppHarness(signedIn: true));
 

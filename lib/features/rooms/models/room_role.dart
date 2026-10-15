@@ -1,0 +1,1 @@
+enum RoomRole { owner, member }

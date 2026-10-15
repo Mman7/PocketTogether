@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pocket_together/features/profile/presentation/cubit/profile_state.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/mock_data.dart';
@@ -34,36 +35,48 @@ class _RoomsPageState extends State<RoomsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final selectedPage = switch (_selectedTab) {
-      0 => _buildRooms(),
-      1 => const HistoryPage(),
-      2 => const StatisticsPage(),
-      _ => BlocProvider(
-        create: (_) =>
-            ProfileCubit(widget.profileRepository)
-              ..load(widget.currentUser?.uid),
-        child: ProfilePage(
-          user: widget.currentUser,
-          onSignOut: widget.onSignOut,
-        ),
-      ),
-    };
+    return BlocProvider(
+      create: (_) =>
+          ProfileCubit(widget.profileRepository)..load(widget.currentUser?.uid),
+      child: BlocBuilder<ProfileCubit, ProfileState>(
+        builder: (context, state) {
+          final profileName = state.profile?.displayName.trim();
+          final authName = widget.currentUser?.displayName?.trim();
+          final emailName = widget.currentUser?.email?.trim().split('@').first;
+          final displayName = switch (true) {
+            _ when profileName?.isNotEmpty == true => profileName!,
+            _ when authName?.isNotEmpty == true => authName!,
+            _ when emailName?.isNotEmpty == true => emailName!,
+            _ => 'there',
+          };
+          final selectedPage = switch (_selectedTab) {
+            0 => _buildRooms(displayName),
+            1 => const HistoryPage(),
+            2 => const StatisticsPage(),
+            _ => ProfilePage(
+              user: widget.currentUser,
+              onSignOut: widget.onSignOut,
+            ),
+          };
 
-    return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: selectedPage,
-          ),
-        ),
+          return Scaffold(
+            body: SafeArea(
+              bottom: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 600),
+                  child: selectedPage,
+                ),
+              ),
+            ),
+            bottomNavigationBar: _buildNavigation(),
+          );
+        },
       ),
-      bottomNavigationBar: _buildNavigation(),
     );
   }
 
-  Widget _buildRooms() {
+  Widget _buildRooms(String displayName) {
     return CustomScrollView(
       key: const PageStorageKey('rooms-home'),
       slivers: [
@@ -71,7 +84,7 @@ class _RoomsPageState extends State<RoomsPage> {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           sliver: SliverList.list(
             children: [
-              _buildHeader(),
+              _buildHeader(displayName),
               const SizedBox(height: 20),
               _buildObligationCard(),
               const SizedBox(height: 26),
@@ -92,27 +105,23 @@ class _RoomsPageState extends State<RoomsPage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(String displayName) {
     return Row(
       children: [
-        const MemberAvatar(
-          name: 'Eric Wong',
-          size: 44,
-          color: Color(0xFFD9E8FF),
-        ),
+        MemberAvatar(name: displayName, size: 44, color: Color(0xFFD9E8FF)),
         const SizedBox(width: 11),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+              const Text(
                 'PocketTogether',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
               ),
               SizedBox(height: 1),
               Text(
-                'Good evening, Eric 👋',
-                style: TextStyle(fontSize: 12, color: AppColors.muted),
+                'Good evening, $displayName 👋',
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
               ),
             ],
           ),
