@@ -1,4 +1,4 @@
-import '../../model/user.dart';
+import '../../models/user.dart';
 
 class ProfileState {
   const ProfileState({this.isLoading = false, this.profile, this.errorMessage});

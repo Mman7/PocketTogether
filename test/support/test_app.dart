@@ -6,7 +6,7 @@ import 'package:pocket_together/app/app.dart';
 import 'package:pocket_together/features/auth/data/auth_repository.dart';
 import 'package:pocket_together/features/auth/models/auth_user.dart';
 import 'package:pocket_together/features/profile/data/profile_repository.dart';
-import 'package:pocket_together/features/profile/model/user.dart';
+import 'package:pocket_together/features/profile/models/user.dart';
 
 class TestAppHarness {
   TestAppHarness({bool signedIn = false})

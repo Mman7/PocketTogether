@@ -1,4 +1,4 @@
-import '../model/user.dart';
+import '../models/user.dart';
 
 abstract interface class ProfileRepository {
   Future<void> createProfile({
