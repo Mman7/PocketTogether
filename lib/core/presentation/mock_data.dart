@@ -72,46 +72,6 @@ class MemberMock {
   String get initials => name.split(' ').map((part) => part[0]).take(2).join();
 }
 
-const rooms = [
-  RoomMock(
-    name: 'Japan Trip',
-    subtitle: 'Tokyo & Kyoto Autumn',
-    emoji: '🇯🇵',
-    currency: 'JPY',
-    total: '¥128,400',
-    members: ['Eric', 'John', 'Amy', 'David'],
-    activity: 'Eric added 🍜 Ramen dinner · 12m ago',
-    live: true,
-  ),
-  RoomMock(
-    name: 'Monthly Household',
-    subtitle: 'Rent, groceries & utilities',
-    emoji: '🏠',
-    currency: 'MYR',
-    total: 'RM 2,340',
-    members: ['Eric', 'Amy', 'David'],
-    activity: 'Amy added 🛒 Groceries · 2h ago',
-  ),
-  RoomMock(
-    name: 'Friends Dinner',
-    subtitle: 'Friday supper club',
-    emoji: '🍜',
-    currency: 'MYR',
-    total: 'RM 186.50',
-    members: ['Eric', 'John', 'Amy', 'Mia'],
-    activity: 'John added 🍲 Dinner · Yesterday',
-  ),
-  RoomMock(
-    name: 'Bangkok Trip',
-    subtitle: 'A long weekend in Thailand',
-    emoji: '🇹🇭',
-    currency: 'THB',
-    total: '฿18,720',
-    members: ['Eric', 'John', 'David'],
-    activity: 'David added 🚕 Airport ride · 3d ago',
-  ),
-];
-
 const japanExpenses = [
   ExpenseMock(
     title: 'Ramen dinner at Ichiran',

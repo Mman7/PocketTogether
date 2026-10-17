@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_together/features/profile/models/user.dart';
+import 'package:pocket_together/features/rooms/data/room_repository.dart';
+import 'package:pocket_together/features/rooms/models/room.dart';
 
 import '../../support/test_app.dart';
 
@@ -21,10 +25,35 @@ void main() {
   });
 
   testWidgets('launches into rooms and switches main sections', (tester) async {
-    await pumpTestApp(tester, TestAppHarness(signedIn: true));
+    final harness = TestAppHarness(signedIn: true);
+    harness.roomRepository.rooms.addAll([
+      const Room(
+        id: 'japan-room',
+        name: 'Japan Trip',
+        description: 'Tokyo & Kyoto Autumn',
+        currency: 'JPY',
+        ownerId: 'test-user',
+      ),
+      const Room(
+        id: 'home-room',
+        name: 'Monthly Household',
+        description: 'Rent, groceries & utilities',
+        currency: 'MYR',
+        ownerId: 'test-user',
+      ),
+      const Room(
+        id: 'other-user-room',
+        name: 'Private room',
+        currency: 'MYR',
+        ownerId: 'another-user',
+      ),
+    ]);
+    await pumpTestApp(tester, harness);
 
     expect(find.text('Your rooms'), findsOneWidget);
     expect(find.text('Japan Trip'), findsOneWidget);
+    expect(find.text('Private room'), findsNothing);
+    expect(harness.roomRepository.requestedOwners, contains('test-user'));
     await tester.scrollUntilVisible(
       find.text('Monthly Household'),
       280,
@@ -56,7 +85,10 @@ void main() {
   testWidgets('create room requires a name and shows invite codes', (
     tester,
   ) async {
-    await pumpTestApp(tester, TestAppHarness(signedIn: true));
+    final harness = TestAppHarness(signedIn: true);
+    final completion = Completer<Room>();
+    harness.roomRepository.pendingCreate = completion;
+    await pumpTestApp(tester, harness);
 
     await tester.tap(find.text('Create room'));
     await tester.pumpAndSettle();
@@ -69,10 +101,59 @@ void main() {
       'Weekend in Penang',
     );
     await tester.tap(find.text('Create room').last);
+    await tester.pump();
+    expect(find.text('Creating room…'), findsOneWidget);
+    expect(find.text('Your room is ready'), findsNothing);
+
+    completion.complete(
+      const Room(
+        id: 'generated-room-id',
+        name: 'Weekend in Penang',
+        currency: 'MYR',
+        ownerId: 'test-user',
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Your room is ready'), findsOneWidget);
-    expect(find.text('FAM8-K2Q'), findsOneWidget);
+    expect(find.text('generated-room-id'), findsOneWidget);
     expect(find.text('FLOW-72MX'), findsOneWidget);
+    expect(harness.roomRepository.requestedName, 'Weekend in Penang');
+    expect(harness.roomRepository.requestedCurrency, 'MYR');
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(find.text('Weekend in Penang'), findsOneWidget);
+  });
+
+  testWidgets('create room shows repository errors without losing input', (
+    tester,
+  ) async {
+    final harness = TestAppHarness(signedIn: true);
+    harness.roomRepository.failure = const RoomFailure(
+      'Unable to create room. Please try again.',
+    );
+    await pumpTestApp(tester, harness);
+
+    await tester.tap(find.text('Create room'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'Weekend in Penang',
+    );
+    await tester.tap(find.text('Create room').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create a room'), findsOneWidget);
+    expect(
+      find.text('Unable to create room. Please try again.'),
+      findsOneWidget,
+    );
+    expect(
+      (tester
+              .widget<TextFormField>(find.byType(TextFormField).first)
+              .controller)
+          ?.text,
+      'Weekend in Penang',
+    );
   });
 
   testWidgets('join room exposes invalid and expired invite feedback', (
@@ -111,6 +192,7 @@ void main() {
 
     expect(find.text('Create room'), findsOneWidget);
     expect(find.text('Join room'), findsOneWidget);
+    expect(find.text('No rooms yet'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -1,13 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_together/features/rooms/models/room.dart';
 
 import '../../support/test_app.dart';
+
+Future<void> _pumpWithJapanRoom(WidgetTester tester) async {
+  final harness = TestAppHarness(signedIn: true);
+  harness.roomRepository.rooms.add(
+    const Room(
+      id: 'japan-room',
+      name: 'Japan Trip',
+      description: 'Tokyo & Kyoto Autumn',
+      currency: 'JPY',
+      ownerId: 'test-user',
+    ),
+  );
+  await pumpTestApp(tester, harness);
+}
 
 void main() {
   testWidgets('room dashboard opens category sheet from add expense', (
     tester,
   ) async {
-    await pumpTestApp(tester, TestAppHarness(signedIn: true));
+    await _pumpWithJapanRoom(tester);
 
     await tester.tap(find.text('Japan Trip'));
     await tester.pumpAndSettle();
@@ -44,7 +59,7 @@ void main() {
   testWidgets('expense amount uses phone keypad and split options', (
     tester,
   ) async {
-    await pumpTestApp(tester, TestAppHarness(signedIn: true));
+    await _pumpWithJapanRoom(tester);
 
     await tester.tap(find.text('Japan Trip'));
     await tester.pumpAndSettle();

@@ -10,6 +10,10 @@ import '../../../expenses/presentation/pages/history_page.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
+import '../../data/room_repository.dart';
+import '../cubit/room_cubit.dart';
+import '../cubit/room_state.dart';
+import '../../models/room.dart';
 import '../../../statistics/presentation/pages/statistics_page.dart';
 import 'room_dashboard_page.dart';
 import 'room_entry_pages.dart';
@@ -18,12 +22,14 @@ class RoomsPage extends StatefulWidget {
   const RoomsPage({
     required this.onSignOut,
     required this.profileRepository,
+    required this.roomRepository,
     this.currentUser,
     super.key,
   });
 
   final Future<void> Function() onSignOut;
   final ProfileRepository profileRepository;
+  final RoomRepository roomRepository;
   final AuthUser? currentUser;
 
   @override
@@ -32,12 +38,32 @@ class RoomsPage extends StatefulWidget {
 
 class _RoomsPageState extends State<RoomsPage> {
   int _selectedTab = 0;
+  late final RoomCubit _roomCubit;
+
+  @override
+  void initState() {
+    super.initState();
+    _roomCubit = RoomCubit(widget.roomRepository)
+      ..loadRooms(widget.currentUser?.uid);
+  }
+
+  @override
+  void dispose() {
+    _roomCubit.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) =>
-          ProfileCubit(widget.profileRepository)..load(widget.currentUser?.uid),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) =>
+              ProfileCubit(widget.profileRepository)
+                ..load(widget.currentUser?.uid),
+        ),
+        BlocProvider<RoomCubit>.value(value: _roomCubit),
+      ],
       child: BlocBuilder<ProfileCubit, ProfileState>(
         builder: (context, state) {
           final profileName = state.profile?.displayName.trim();
@@ -50,7 +76,10 @@ class _RoomsPageState extends State<RoomsPage> {
             _ => 'there',
           };
           final selectedPage = switch (_selectedTab) {
-            0 => _buildRooms(displayName),
+            0 => BlocBuilder<RoomCubit, RoomState>(
+              builder: (context, roomState) =>
+                  _buildRooms(displayName, roomState),
+            ),
             1 => const HistoryPage(),
             2 => const StatisticsPage(),
             _ => ProfilePage(
@@ -76,7 +105,7 @@ class _RoomsPageState extends State<RoomsPage> {
     );
   }
 
-  Widget _buildRooms(String displayName) {
+  Widget _buildRooms(String displayName, RoomState roomState) {
     return CustomScrollView(
       key: const PageStorageKey('rooms-home'),
       slivers: [
@@ -90,13 +119,28 @@ class _RoomsPageState extends State<RoomsPage> {
               const SizedBox(height: 26),
               SectionHeading(
                 'Your rooms',
-                trailing: StatusPill(label: '${rooms.length}'),
+                trailing: StatusPill(label: '${roomState.rooms.length}'),
               ),
               const SizedBox(height: 14),
-              for (final room in rooms) ...[
-                _RoomCard(room: room, onTap: () => _openRoom(room)),
-                const SizedBox(height: 12),
-              ],
+              if (roomState.isLoadingRooms)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (roomState.roomsErrorMessage != null)
+                _RoomListError(
+                  message: roomState.roomsErrorMessage!,
+                  onRetry: () => context.read<RoomCubit>().loadRooms(
+                    widget.currentUser?.uid,
+                  ),
+                )
+              else if (roomState.rooms.isEmpty)
+                const _RoomsEmptyState()
+              else
+                for (final room in roomState.rooms) ...[
+                  _RoomCard(room: room, onTap: () => _openRoom(room)),
+                  const SizedBox(height: 12),
+                ],
               const SizedBox(height: 76),
             ],
           ),
@@ -264,7 +308,7 @@ class _RoomsPageState extends State<RoomsPage> {
     );
   }
 
-  void _openRoom(RoomMock room) {
+  void _openRoom(Room room) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (context) => _RoomPreviewPage(room: room),
@@ -281,7 +325,18 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   void _showRoomEntrySheet({required bool isCreate}) {
-    final page = isCreate ? const CreateRoomPage() : const JoinRoomPage();
+    final ownerId = widget.currentUser?.uid;
+    if (isCreate && (ownerId == null || ownerId.isEmpty)) {
+      _showMessage('Sign in to create a room.');
+      return;
+    }
+
+    final Widget page = isCreate
+        ? BlocProvider<RoomCubit>.value(
+            value: _roomCubit,
+            child: CreateRoomPage(ownerId: ownerId!),
+          )
+        : const JoinRoomPage();
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
@@ -297,11 +352,12 @@ class _RoomsPageState extends State<RoomsPage> {
 class _RoomCard extends StatelessWidget {
   const _RoomCard({required this.room, required this.onTap});
 
-  final RoomMock room;
+  final Room room;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final description = room.description?.trim();
     return SurfaceCard(
       onTap: onTap,
       padding: const EdgeInsets.all(16),
@@ -319,7 +375,11 @@ class _RoomCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                 ),
                 alignment: Alignment.center,
-                child: Text(room.emoji, style: const TextStyle(fontSize: 25)),
+                child: const Icon(
+                  Icons.groups_rounded,
+                  size: 25,
+                  color: AppColors.primary,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -337,7 +397,9 @@ class _RoomCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      room.subtitle,
+                      description == null || description.isEmpty
+                          ? 'Shared room'
+                          : description,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -348,75 +410,34 @@ class _RoomCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (room.live)
-                const StatusPill(label: 'Live', color: AppColors.paleCyan)
-              else
-                StatusPill(label: '${room.members.length} members'),
+              StatusPill(label: room.currency ?? 'Room'),
             ],
           ),
           const SizedBox(height: 15),
           const Divider(height: 1, color: AppColors.paleBlue),
           const SizedBox(height: 12),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Total spent',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      room.total,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ),
+              const Icon(Icons.tag_rounded, size: 15, color: AppColors.primary),
+              const SizedBox(width: 7),
+              const Text(
+                'Room ID',
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
               ),
-              AvatarStack(names: room.members),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-            decoration: BoxDecoration(
-              color: AppColors.paleBlue.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.schedule_rounded,
-                  size: 15,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    room.activity,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  room.id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 17,
-                  color: AppColors.muted,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -427,10 +448,68 @@ class _RoomCard extends StatelessWidget {
 class _RoomPreviewPage extends StatelessWidget {
   const _RoomPreviewPage({required this.room});
 
-  final RoomMock room;
+  final Room room;
 
   @override
   Widget build(BuildContext context) {
-    return RoomDashboardPage(room: room);
+    return RoomDashboardPage(
+      room: RoomMock(
+        name: room.name,
+        subtitle: room.description ?? 'Shared room',
+        emoji: '🏠',
+        currency: room.currency ?? 'MYR',
+        total: '—',
+        members: [
+          for (final member in roomMembers) member.name.split(' ').first,
+        ],
+        activity: 'Room created',
+      ),
+    );
+  }
+}
+
+class _RoomsEmptyState extends StatelessWidget {
+  const _RoomsEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SurfaceCard(
+      child: Column(
+        children: [
+          Icon(Icons.groups_outlined, color: AppColors.primary, size: 30),
+          SizedBox(height: 8),
+          Text('No rooms yet', style: TextStyle(fontWeight: FontWeight.w800)),
+          SizedBox(height: 3),
+          Text(
+            'Create a room to start sharing expenses.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoomListError extends StatelessWidget {
+  const _RoomListError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Column(
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
   }
 }

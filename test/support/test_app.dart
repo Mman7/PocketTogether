@@ -1,26 +1,30 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_together/app/app.dart';
 import 'package:pocket_together/features/auth/data/auth_repository.dart';
 import 'package:pocket_together/features/auth/models/auth_user.dart';
 import 'package:pocket_together/features/profile/data/profile_repository.dart';
 import 'package:pocket_together/features/profile/models/user.dart';
+import 'package:pocket_together/features/rooms/data/room_repository.dart';
+import 'package:pocket_together/features/rooms/models/room.dart';
 
 class TestAppHarness {
   TestAppHarness({bool signedIn = false})
     : authRepository = FakeAuthRepository(signedIn: signedIn),
-      profileRepository = FakeProfileRepository() {
+      profileRepository = FakeProfileRepository(),
+      roomRepository = FakeRoomRepository() {
     addTearDown(authRepository.dispose);
   }
 
   final FakeAuthRepository authRepository;
   final FakeProfileRepository profileRepository;
+  final FakeRoomRepository roomRepository;
 
   PocketTogetherApp get app => PocketTogetherApp(
     authRepository: authRepository,
     profileRepository: profileRepository,
+    roomRepository: roomRepository,
   );
 }
 
@@ -30,21 +34,21 @@ Future<void> pumpTestApp(WidgetTester tester, TestAppHarness harness) async {
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({bool signedIn = false}) : _signedIn = signedIn;
+  FakeAuthRepository({this.signedIn = false});
 
   final StreamController<bool> _authState = StreamController<bool>.broadcast(
     sync: true,
   );
-  bool _signedIn;
+  bool signedIn;
   String? registeredName;
   String? resetEmail;
   bool googleSignInRequested = false;
 
   @override
-  bool get isSignedIn => _signedIn;
+  bool get isSignedIn => signedIn;
 
   @override
-  AuthUser? get currentUser => _signedIn
+  AuthUser? get currentUser => signedIn
       ? const AuthUser(
           uid: 'test-user',
           displayName: 'Alex Morgan',
@@ -57,14 +61,14 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signIn({required String email, required String password}) async {
-    _signedIn = true;
+    signedIn = true;
     _authState.add(true);
   }
 
   @override
   Future<void> signInWithGoogle() async {
     googleSignInRequested = true;
-    _signedIn = true;
+    signedIn = true;
     _authState.add(true);
   }
 
@@ -75,7 +79,7 @@ class FakeAuthRepository implements AuthRepository {
     required String password,
   }) async {
     registeredName = displayName;
-    _signedIn = true;
+    signedIn = true;
     _authState.add(true);
   }
 
@@ -86,7 +90,7 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() async {
-    _signedIn = false;
+    signedIn = false;
     _authState.add(false);
   }
 
@@ -142,5 +146,52 @@ class FakeProfileRepository implements ProfileRepository {
         createdAt: profile.createdAt,
       );
     }
+  }
+}
+
+class FakeRoomRepository implements RoomRepository {
+  final rooms = <Room>[];
+  final requestedOwners = <String>[];
+  String? requestedName;
+  String? requestedCurrency;
+  Object? failure;
+  Object? loadFailure;
+  Completer<Room>? pendingCreate;
+
+  @override
+  Future<List<Room>> getRooms(String ownerId) async {
+    requestedOwners.add(ownerId);
+    if (loadFailure != null) throw loadFailure!;
+    return rooms.where((room) => room.ownerId == ownerId).toList();
+  }
+
+  @override
+  Future<Room> createRoom({
+    required String ownerId,
+    required String name,
+    required String currency,
+    String? description,
+  }) async {
+    requestedName = name;
+    requestedCurrency = currency;
+    final pending = pendingCreate;
+    if (pending != null) {
+      final room = await pending.future;
+      rooms.add(room);
+      return room;
+    }
+    if (failure != null) throw failure!;
+
+    final room = Room(
+      id: 'generated-room-id',
+      name: name,
+      currency: currency,
+      description: description,
+      ownerId: ownerId,
+      createdAt: DateTime.utc(2026),
+      updatedAt: DateTime.utc(2026),
+    );
+    rooms.add(room);
+    return room;
   }
 }

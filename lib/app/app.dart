@@ -12,6 +12,8 @@ import '../features/auth/presentation/cubit/auth_cubit.dart';
 import '../features/auth/presentation/pages/auth_pages.dart';
 import '../features/profile/data/firebase_profile_repository.dart';
 import '../features/profile/data/profile_repository.dart';
+import '../features/rooms/data/firebase_room_repository.dart';
+import '../features/rooms/data/room_repository.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
 import 'theme/app_theme.dart';
 
@@ -19,11 +21,13 @@ class PocketTogetherApp extends StatefulWidget {
   const PocketTogetherApp({
     this.authRepository,
     this.profileRepository,
+    this.roomRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final ProfileRepository? profileRepository;
+  final RoomRepository? roomRepository;
 
   @override
   State<PocketTogetherApp> createState() => _PocketTogetherAppState();
@@ -32,6 +36,7 @@ class PocketTogetherApp extends StatefulWidget {
 class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final AuthRepository _authRepository;
   late final ProfileRepository _profileRepository;
+  late final RoomRepository _roomRepository;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
 
@@ -43,6 +48,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _profileRepository =
         widget.profileRepository ??
         FirebaseProfileRepository(FirebaseFirestore.instance);
+    _roomRepository =
+        widget.roomRepository ??
+        FirebaseRoomRepository(FirebaseFirestore.instance);
     _authStateRefresh = _AuthStateRefresh(_authRepository.authStateChanges);
     _router = GoRouter(
       initialLocation: '/rooms',
@@ -71,6 +79,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
           builder: (context, state) => RoomsPage(
             currentUser: _authRepository.currentUser,
             profileRepository: _profileRepository,
+            roomRepository: _roomRepository,
             onSignOut: () => context.read<AuthCubit>().signOut(),
           ),
         ),
