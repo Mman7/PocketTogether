@@ -7,6 +7,8 @@ class Expense {
   final String? note;
   final String paidByUserId;
   final String createdByUserId;
+  final String? transferMethod;
+  final String? transferToUserId;
   final Map<String, int> splitAmountsInCents;
   final DateTime expenseDate;
   final DateTime? createdAt;
@@ -19,6 +21,8 @@ class Expense {
     this.note,
     required this.paidByUserId,
     required this.createdByUserId,
+    this.transferMethod,
+    this.transferToUserId,
     required this.splitAmountsInCents,
     required this.expenseDate,
     this.createdAt,
@@ -32,6 +36,36 @@ class Expense {
     );
 
     return totalSplit == amountInCents;
+  }
+
+  Expense copyWith({
+    String? id,
+    int? amountInCents,
+    String? category,
+    String? note,
+    String? paidByUserId,
+    String? createdByUserId,
+    String? transferMethod,
+    String? transferToUserId,
+    Map<String, int>? splitAmountsInCents,
+    DateTime? expenseDate,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      amountInCents: amountInCents ?? this.amountInCents,
+      category: category ?? this.category,
+      note: note ?? this.note,
+      paidByUserId: paidByUserId ?? this.paidByUserId,
+      createdByUserId: createdByUserId ?? this.createdByUserId,
+      transferMethod: transferMethod ?? this.transferMethod,
+      transferToUserId: transferToUserId ?? this.transferToUserId,
+      splitAmountsInCents: splitAmountsInCents ?? this.splitAmountsInCents,
+      expenseDate: expenseDate ?? this.expenseDate,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 
   factory Expense.fromMap(String id, Map<String, dynamic> data) {
@@ -51,6 +85,8 @@ class Expense {
       note: data['note'] as String?,
       paidByUserId: data['paidByUserId'] as String,
       createdByUserId: data['createdByUserId'] as String,
+      transferMethod: data['transferMethod'] as String?,
+      transferToUserId: data['transferToUserId'] as String?,
       splitAmountsInCents: rawSplits.map(
         (key, value) => MapEntry(key, (value as num).toInt()),
       ),
@@ -67,6 +103,8 @@ class Expense {
       'note': note,
       'paidByUserId': paidByUserId,
       'createdByUserId': createdByUserId,
+      'transferMethod': transferMethod,
+      'transferToUserId': transferToUserId,
       'splitAmountsInCents': splitAmountsInCents,
       'expenseDate': Timestamp.fromDate(expenseDate),
       'createdAt': createdAt == null

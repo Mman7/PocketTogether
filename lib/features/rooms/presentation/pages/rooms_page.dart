@@ -3,9 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pocket_together/features/profile/presentation/cubit/profile_state.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/presentation/mock_data.dart';
 import '../../../auth/models/auth_user.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
+import '../../../expenses/data/expense_repository.dart';
 import '../../../expenses/presentation/pages/history_page.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
@@ -23,6 +23,7 @@ class RoomsPage extends StatefulWidget {
     required this.onSignOut,
     required this.profileRepository,
     required this.roomRepository,
+    required this.expenseRepository,
     this.currentUser,
     super.key,
   });
@@ -30,6 +31,7 @@ class RoomsPage extends StatefulWidget {
   final Future<void> Function() onSignOut;
   final ProfileRepository profileRepository;
   final RoomRepository roomRepository;
+  final ExpenseRepository expenseRepository;
   final AuthUser? currentUser;
 
   @override
@@ -130,9 +132,7 @@ class _RoomsPageState extends State<RoomsPage> {
               else if (roomState.roomsErrorMessage != null)
                 _RoomListError(
                   message: roomState.roomsErrorMessage!,
-                  onRetry: () => context.read<RoomCubit>().loadRooms(
-                    widget.currentUser?.uid,
-                  ),
+                  onRetry: () => _roomCubit.loadRooms(widget.currentUser?.uid),
                 )
               else if (roomState.rooms.isEmpty)
                 const _RoomsEmptyState()
@@ -311,7 +311,16 @@ class _RoomsPageState extends State<RoomsPage> {
   void _openRoom(Room room) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (context) => _RoomPreviewPage(room: room),
+        builder: (context) => _RoomPreviewPage(
+          room: room,
+          userId: widget.currentUser?.uid ?? '',
+          displayName:
+              widget.currentUser?.displayName?.trim().isNotEmpty == true
+              ? widget.currentUser!.displayName!.trim()
+              : widget.currentUser?.email?.trim().split('@').first ?? 'Member',
+          roomRepository: widget.roomRepository,
+          expenseRepository: widget.expenseRepository,
+        ),
       ),
     );
   }
@@ -325,8 +334,8 @@ class _RoomsPageState extends State<RoomsPage> {
   }
 
   void _showRoomEntrySheet({required bool isCreate}) {
-    final ownerId = widget.currentUser?.uid;
-    if (isCreate && (ownerId == null || ownerId.isEmpty)) {
+    final userId = widget.currentUser?.uid;
+    if (userId == null || userId.isEmpty) {
       _showMessage('Sign in to create a room.');
       return;
     }
@@ -334,9 +343,12 @@ class _RoomsPageState extends State<RoomsPage> {
     final Widget page = isCreate
         ? BlocProvider<RoomCubit>.value(
             value: _roomCubit,
-            child: CreateRoomPage(ownerId: ownerId!),
+            child: const CreateRoomPage(),
           )
-        : const JoinRoomPage();
+        : BlocProvider<RoomCubit>.value(
+            value: _roomCubit,
+            child: JoinRoomPage(onJoined: (room) => _openRoom(room)),
+          );
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
 
@@ -446,24 +458,28 @@ class _RoomCard extends StatelessWidget {
 }
 
 class _RoomPreviewPage extends StatelessWidget {
-  const _RoomPreviewPage({required this.room});
+  const _RoomPreviewPage({
+    required this.room,
+    required this.userId,
+    required this.displayName,
+    required this.roomRepository,
+    required this.expenseRepository,
+  });
 
   final Room room;
+  final String userId;
+  final String displayName;
+  final RoomRepository roomRepository;
+  final ExpenseRepository expenseRepository;
 
   @override
   Widget build(BuildContext context) {
     return RoomDashboardPage(
-      room: RoomMock(
-        name: room.name,
-        subtitle: room.description ?? 'Shared room',
-        emoji: '🏠',
-        currency: room.currency ?? 'MYR',
-        total: '—',
-        members: [
-          for (final member in roomMembers) member.name.split(' ').first,
-        ],
-        activity: 'Room created',
-      ),
+      room: room,
+      currentUserId: userId,
+      currentUserDisplayName: displayName,
+      roomRepository: roomRepository,
+      expenseRepository: expenseRepository,
     );
   }
 }

@@ -10,6 +10,8 @@ import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/firebase_auth_repository.dart';
 import '../features/auth/presentation/cubit/auth_cubit.dart';
 import '../features/auth/presentation/pages/auth_pages.dart';
+import '../features/expenses/data/expense_repository.dart';
+import '../features/expenses/data/firebase_expense_repository.dart';
 import '../features/profile/data/firebase_profile_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/rooms/data/firebase_room_repository.dart';
@@ -22,12 +24,14 @@ class PocketTogetherApp extends StatefulWidget {
     this.authRepository,
     this.profileRepository,
     this.roomRepository,
+    this.expenseRepository,
     super.key,
   });
 
   final AuthRepository? authRepository;
   final ProfileRepository? profileRepository;
   final RoomRepository? roomRepository;
+  final ExpenseRepository? expenseRepository;
 
   @override
   State<PocketTogetherApp> createState() => _PocketTogetherAppState();
@@ -37,6 +41,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final AuthRepository _authRepository;
   late final ProfileRepository _profileRepository;
   late final RoomRepository _roomRepository;
+  late final ExpenseRepository _expenseRepository;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
 
@@ -51,6 +56,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _roomRepository =
         widget.roomRepository ??
         FirebaseRoomRepository(FirebaseFirestore.instance);
+    _expenseRepository =
+        widget.expenseRepository ??
+        FirebaseExpenseRepository(FirebaseFirestore.instance);
     _authStateRefresh = _AuthStateRefresh(_authRepository.authStateChanges);
     _router = GoRouter(
       initialLocation: '/rooms',
@@ -80,6 +88,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
             currentUser: _authRepository.currentUser,
             profileRepository: _profileRepository,
             roomRepository: _roomRepository,
+            expenseRepository: _expenseRepository,
             onSignOut: () => context.read<AuthCubit>().signOut(),
           ),
         ),

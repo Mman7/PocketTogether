@@ -8,7 +8,6 @@ class RoomMock {
     required this.currency,
     required this.total,
     required this.members,
-    required this.activity,
     this.live = false,
   });
 
@@ -18,7 +17,6 @@ class RoomMock {
   final String currency;
   final String total;
   final List<String> members;
-  final String activity;
   final bool live;
 }
 

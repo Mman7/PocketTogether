@@ -1,15 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/presentation/mock_data.dart';
+import '../../../../shared/presentation/category_emoji.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
+import '../../../rooms/models/room.dart';
+import '../../../rooms/models/room_member.dart';
+import '../../models/expense.dart';
+import '../cubit/expense_cubit.dart';
 import '../widgets/category_bottom_sheet.dart';
 
 class AddExpensePage extends StatefulWidget {
-  const AddExpensePage({required this.room, this.expense, super.key});
+  const AddExpensePage({
+    required this.room,
+    required this.members,
+    required this.currentUserId,
+    required this.currentUserDisplayName,
+    this.expense,
+    super.key,
+  });
 
-  final RoomMock room;
-  final ExpenseMock? expense;
+  final Room room;
+  final List<RoomMember> members;
+  final String currentUserId;
+  final String currentUserDisplayName;
+  final Expense? expense;
 
   @override
   State<AddExpensePage> createState() => _AddExpensePageState();
@@ -19,11 +35,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
   late String _amount;
   late final TextEditingController _amountController;
   late String _category;
-  late String _emoji;
-  late String _paidBy;
-  late int _splitCount;
+  late String _paidByUserId;
+  late Set<String> _splitMemberIds;
   late String _transferMethod;
-  late String _transferTo;
+  late String _transferToUserId;
   late final TextEditingController _note;
   late DateTime _date;
 
@@ -32,20 +47,21 @@ class _AddExpensePageState extends State<AddExpensePage> {
   @override
   void initState() {
     super.initState();
-    _amount =
-        widget.expense?.amount.toStringAsFixed(
-          widget.expense!.amount % 1 == 0 ? 0 : 2,
-        ) ??
-        '';
+    _amount = widget.expense == null
+        ? ''
+        : (widget.expense!.amountInCents / 100).toStringAsFixed(2);
     _amountController = TextEditingController(text: _amount);
     _category = widget.expense?.category ?? 'Food';
-    _emoji = widget.expense?.emoji ?? '🍜';
-    _paidBy = widget.expense?.paidBy ?? 'Eric';
-    _splitCount = widget.expense?.splitCount ?? widget.room.members.length;
+    _paidByUserId = widget.expense?.paidByUserId ?? widget.currentUserId;
+    _splitMemberIds =
+        widget.expense?.splitAmountsInCents.keys.toSet() ??
+        widget.members.map((member) => member.userId).toSet();
     _transferMethod = widget.expense?.transferMethod ?? 'Bank transfer';
-    final recipients = _transferRecipients(_paidBy);
-    _transferTo = widget.expense?.transferTo ?? recipients.first;
-    _date = widget.expense?.date ?? DateTime.now();
+    final recipients = _transferRecipients(_paidByUserId);
+    _transferToUserId =
+        widget.expense?.transferToUserId ??
+        (recipients.isEmpty ? _paidByUserId : recipients.first);
+    _date = widget.expense?.expenseDate ?? DateTime.now();
     _note = TextEditingController(text: widget.expense?.note ?? '');
   }
 
@@ -59,6 +75,18 @@ class _AddExpensePageState extends State<AddExpensePage> {
   @override
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amount) ?? 0;
+    final expenseState = context.watch<ExpenseCubit>().state;
+    final quickCategories = <String>[
+      'Food',
+      'Transport',
+      'Shopping',
+      'Hotel',
+      'Coffee',
+      'Transfer',
+    ];
+    if (!quickCategories.contains(_category)) {
+      quickCategories.insert(0, _category);
+    }
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -88,7 +116,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                   _AmountCard(
                     controller: _amountController,
                     onAmountChanged: (value) => setState(() => _amount = value),
-                    currency: _currencySymbol(widget.room.currency),
+                    currency: _currencySymbol(widget.room.currency ?? 'MYR'),
                     roomName: widget.room.name,
                     onQuickAdd: _addAmount,
                   ),
@@ -116,19 +144,12 @@ class _AddExpensePageState extends State<AddExpensePage> {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       children: [
-                        for (final category in [
-                          'Food',
-                          'Transport',
-                          'Shopping',
-                          'Hotel',
-                          'Coffee',
-                          'Transfer',
-                        ])
+                        for (final category in quickCategories)
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: _CategoryChip(
                               name: category,
-                              emoji: _emojiFor(category),
+                              emoji: categoryEmoji(category),
                               selected: _category == category,
                               onTap: () => _setCategory(category),
                             ),
@@ -151,26 +172,32 @@ class _AddExpensePageState extends State<AddExpensePage> {
                           label: 'Paid by',
                           trailing: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: _paidBy,
+                              value:
+                                  widget.members.any(
+                                    (member) => member.userId == _paidByUserId,
+                                  )
+                                  ? _paidByUserId
+                                  : null,
                               borderRadius: BorderRadius.circular(14),
                               items: [
-                                for (final member in widget.room.members)
+                                for (final member in widget.members)
                                   DropdownMenuItem(
-                                    value: member,
+                                    value: member.userId,
                                     child: Text(
-                                      member == 'Eric'
-                                          ? '$member (You)'
-                                          : member,
+                                      member.userId == widget.currentUserId
+                                          ? '${member.displayName} (You)'
+                                          : member.displayName,
                                     ),
                                   ),
                               ],
                               onChanged: (value) {
                                 if (value == null) return;
                                 setState(() {
-                                  _paidBy = value;
+                                  _paidByUserId = value;
                                   final recipients = _transferRecipients(value);
-                                  if (!recipients.contains(_transferTo)) {
-                                    _transferTo = recipients.first;
+                                  if (!recipients.contains(_transferToUserId) &&
+                                      recipients.isNotEmpty) {
+                                    _transferToUserId = recipients.first;
                                   }
                                 });
                               },
@@ -217,55 +244,78 @@ class _AddExpensePageState extends State<AddExpensePage> {
                               width: 150,
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
-                                  value: _transferTo,
+                                  value:
+                                      _transferRecipients(_paidByUserId)
+                                          .contains(_transferToUserId)
+                                      ? _transferToUserId
+                                      : null,
                                   isExpanded: true,
                                   alignment: AlignmentDirectional.centerEnd,
                                   borderRadius: BorderRadius.circular(14),
                                   items: [
                                     for (final member in _transferRecipients(
-                                      _paidBy,
+                                      _paidByUserId,
                                     ))
                                       DropdownMenuItem(
                                         value: member,
-                                        child: Text(member),
+                                        child: Text(_memberName(member)),
                                       ),
                                   ],
                                   onChanged: (value) => setState(
-                                    () => _transferTo = value ?? _transferTo,
+                                    () => _transferToUserId =
+                                        value ?? _transferToUserId,
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ] else
-                          _MetadataRow(
-                            icon: Icons.call_split_rounded,
-                            label: 'Split with',
-                            trailing: DropdownButtonHideUnderline(
-                              child: DropdownButton<int>(
-                                value: _splitCount,
-                                borderRadius: BorderRadius.circular(14),
-                                items: [
-                                  for (
-                                    var count = 1;
-                                    count <= widget.room.members.length;
-                                    count++
-                                  )
-                                    DropdownMenuItem(
-                                      value: count,
-                                      child: Text(
-                                        count == 1
-                                            ? 'Just me'
-                                            : '$count members',
-                                      ),
-                                    ),
-                                ],
-                                onChanged: (value) => setState(
-                                  () => _splitCount = value ?? _splitCount,
+                        ] else ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(13, 12, 13, 4),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.call_split_rounded,
+                                  size: 19,
+                                  color: AppColors.primary,
                                 ),
-                              ),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'Split with',
+                                    style: TextStyle(
+                                      color: AppColors.muted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${_selectedSplitIds.length} selected',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          for (final member in widget.members)
+                            CheckboxListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                              ),
+                              title: Text(member.displayName),
+                              value: _selectedSplitIds.contains(member.userId),
+                              onChanged: (selected) => setState(() {
+                                if (selected == true) {
+                                  _splitMemberIds.add(member.userId);
+                                } else {
+                                  _splitMemberIds.remove(member.userId);
+                                }
+                              }),
+                            ),
+                        ],
                         const Divider(height: 1, color: AppColors.paleBlue),
                         _MetadataRow(
                           icon: Icons.edit_note_rounded,
@@ -310,10 +360,15 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 border: Border(top: BorderSide(color: AppColors.border)),
               ),
               child: PrimaryButton(
-                label:
-                    '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency)}${_amount.isEmpty ? '0' : _amount}',
-                icon: Icons.add_task_rounded,
-                onPressed: amount > 0 ? _save : null,
+                label: expenseState.isMutating
+                    ? 'Saving…'
+                    : '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency ?? 'MYR')}${_amount.isEmpty ? '0' : _amount}',
+                icon: expenseState.isMutating
+                    ? Icons.hourglass_top_rounded
+                    : Icons.add_task_rounded,
+                onPressed: amount > 0 && !expenseState.isMutating
+                    ? _save
+                    : null,
               ),
             ),
           ],
@@ -334,28 +389,28 @@ class _AddExpensePageState extends State<AddExpensePage> {
 
   bool get _isTransfer => _category == 'Transfer';
 
-  String get _dateGroup {
-    final today = DateTime.now();
-    final selectedDay = DateTime(_date.year, _date.month, _date.day);
-    final todayDate = DateTime(today.year, today.month, today.day);
-    final daysAgo = todayDate.difference(selectedDay).inDays;
-    if (daysAgo == 0) return 'Today';
-    if (daysAgo == 1) return 'Yesterday';
-    return 'Earlier';
+  List<String> get _selectedSplitIds => _isTransfer
+      ? (_transferToUserId.isEmpty ? const [] : [_transferToUserId])
+      : _splitMemberIds
+            .where((id) => widget.members.any((member) => member.userId == id))
+            .toList();
+
+  List<String> _transferRecipients(String paidByUserId) {
+    return widget.members
+        .map((member) => member.userId)
+        .where((userId) => userId != paidByUserId)
+        .toList();
   }
 
-  List<String> _transferRecipients(String paidBy) {
-    final recipients = widget.room.members
-        .where((member) => member != paidBy)
-        .toList();
-    return recipients.isEmpty ? widget.room.members : recipients;
+  String _memberName(String userId) {
+    for (final member in widget.members) {
+      if (member.userId == userId) return member.displayName;
+    }
+    return userId;
   }
 
   void _setCategory(String category) {
-    setState(() {
-      _category = category;
-      _emoji = _emojiFor(category);
-    });
+    setState(() => _category = category);
   }
 
   Future<void> _chooseCategory() async {
@@ -364,10 +419,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
       selected: _category,
     );
     if (!mounted || selected == null) return;
-    setState(() {
-      _category = selected.name;
-      _emoji = selected.emoji;
-    });
+    setState(() => _category = selected.name);
   }
 
   Future<void> _chooseDate() async {
@@ -390,26 +442,49 @@ class _AddExpensePageState extends State<AddExpensePage> {
     setState(() => _amount = updatedAmount);
   }
 
-  void _save() {
+  Future<void> _save() async {
     final amount = double.tryParse(_amount);
     if (amount == null || amount <= 0) return;
-    Navigator.pop(
-      context,
-      ExpenseMock(
-        title: _note.text.trim().isEmpty ? _category : _note.text.trim(),
-        category: _category,
-        emoji: _emoji,
-        amount: amount,
-        paidBy: _paidBy,
-        splitCount: _splitCount,
-        time: 'Now',
-        dateGroup: _dateGroup,
-        note: _note.text.trim(),
-        transferMethod: _isTransfer ? _transferMethod : null,
-        transferTo: _isTransfer ? _transferTo : null,
-        date: _date,
-      ),
+    final amountInCents = (amount * 100).round();
+    final splitIds = _selectedSplitIds;
+    if (splitIds.isEmpty || splitIds.length > amountInCents) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Select valid members for this split.')),
+        );
+      return;
+    }
+    final previous = widget.expense;
+    final note = _note.text.trim();
+    final expense = Expense(
+      id: previous?.id ?? '',
+      amountInCents: amountInCents,
+      category: _category,
+      note: note.isEmpty ? null : note,
+      paidByUserId: _paidByUserId,
+      createdByUserId: previous?.createdByUserId ?? widget.currentUserId,
+      transferMethod: _isTransfer ? _transferMethod : null,
+      transferToUserId: _isTransfer ? _transferToUserId : null,
+      splitAmountsInCents: _splitAmounts(splitIds, amountInCents),
+      expenseDate: DateTime(_date.year, _date.month, _date.day),
+      createdAt: previous?.createdAt,
+      updatedAt: previous?.updatedAt,
     );
+    final cubit = context.read<ExpenseCubit>();
+    final saved = _editing
+        ? await cubit.updateExpense(widget.room.id, expense)
+        : await cubit.createExpense(widget.room.id, expense);
+    if (saved != null && mounted) Navigator.pop(context);
+  }
+
+  Map<String, int> _splitAmounts(List<String> memberIds, int totalCents) {
+    final baseAmount = totalCents ~/ memberIds.length;
+    final remainder = totalCents % memberIds.length;
+    return {
+      for (var index = 0; index < memberIds.length; index++)
+        memberIds[index]: baseAmount + (index < remainder ? 1 : 0),
+    };
   }
 
   String _currencySymbol(String currency) {
@@ -437,16 +512,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
     'Nov',
     'Dec',
   ][month - 1];
-
-  String _emojiFor(String category) => switch (category) {
-    'Food' => '🍜',
-    'Transport' => '🚆',
-    'Shopping' => '🛍️',
-    'Hotel' => '🏨',
-    'Coffee' => '☕',
-    'Transfer' => '↔️',
-    _ => '📦',
-  };
 }
 
 class _AmountCard extends StatelessWidget {
@@ -494,6 +559,13 @@ class _AmountCard extends StatelessWidget {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  inputFormatters: [
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      return RegExp(r'^\d*\.?\d{0,2}$').hasMatch(newValue.text)
+                          ? newValue
+                          : oldValue;
+                    }),
+                  ],
                   textAlign: TextAlign.center,
                   maxLength: 9,
                   onChanged: onAmountChanged,

@@ -29,6 +29,7 @@ class RoomMember {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId,
       'displayName': displayName,
       if (email != null) 'email': email,
       'role': role.name,

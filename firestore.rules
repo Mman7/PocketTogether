@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isRoomMember(roomId) {
+      return signedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/rooms/$(roomId)).data.memberIds;
+    }
+
+    match /rooms/{roomId} {
+      allow read: if signedIn() &&
+          request.auth.uid in resource.data.memberIds;
+      allow create, update, delete: if false;
+
+      match /members/{userId} {
+        allow read: if isRoomMember(roomId);
+        allow create, update, delete: if false;
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isRoomMember(roomId);
+        allow create: if isRoomMember(roomId) &&
+            request.resource.data.createdByUserId == request.auth.uid &&
+            request.resource.data.amountInCents is int &&
+            request.resource.data.amountInCents > 0 &&
+            request.resource.data.paidByUserId is string &&
+            request.resource.data.splitAmountsInCents is map;
+        allow update: if isRoomMember(roomId) &&
+            request.resource.data.createdByUserId == resource.data.createdByUserId &&
+            request.resource.data.amountInCents is int &&
+            request.resource.data.amountInCents > 0 &&
+            request.resource.data.paidByUserId is string &&
+            request.resource.data.splitAmountsInCents is map;
+        allow delete: if isRoomMember(roomId);
+      }
+    }
+
+    match /roomInvites/{inviteCode} {
+      allow read, write: if false;
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+  }
+}

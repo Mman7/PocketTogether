@@ -1,0 +1,1 @@
+{ "version": "0.2.0", "configurations": [ { "name": "Flutter (Local Emulators)", "request": "launch", "type": "dart", "program": "lib/main.dart", "args": [ "--dart-define=USE_FIREBASE_EMULATORS=true" ] }, { "name": "Flutter (Production Firebase)", "request": "launch", "type": "dart", "program": "lib/main.dart" } ] }

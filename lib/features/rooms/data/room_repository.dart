@@ -1,20 +1,28 @@
 import '../models/room.dart';
+import '../models/room_invite.dart';
+import '../models/room_operation_result.dart';
+import '../models/room_member.dart';
 
 abstract interface class RoomRepository {
-  Future<List<Room>> getRooms(String ownerId);
+  Stream<List<Room>> watchMyRooms(String userId);
 
-  Future<Room> createRoom({
-    required String ownerId,
+  Future<List<RoomMember>> getRoomMembers(String roomId);
+
+  Future<RoomInvite> createInvite({required String roomId});
+
+  Future<RoomJoinResult> joinRoom({required String inviteCode});
+
+  Future<RoomCreationResult> createRoom({
     required String name,
     required String currency,
-    String? description,
   });
 }
 
 class RoomFailure implements Exception {
-  const RoomFailure(this.message);
+  const RoomFailure(this.message, {this.code});
 
   final String message;
+  final String? code;
 
   @override
   String toString() => message;

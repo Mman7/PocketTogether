@@ -1,36 +1,99 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../core/presentation/mock_data.dart';
+import '../../../../shared/presentation/category_emoji.dart';
+import '../../../../shared/presentation/short_date.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
+import '../../../expenses/data/expense_repository.dart';
+import '../../../expenses/models/expense.dart';
+import '../../../expenses/presentation/cubit/expense_cubit.dart';
+import '../../../expenses/presentation/cubit/expense_state.dart';
 import '../../../expenses/presentation/pages/add_expense_page.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../data/room_repository.dart';
+import '../../models/room.dart';
+import '../../models/room_member.dart';
 
 class RoomDashboardPage extends StatefulWidget {
-  const RoomDashboardPage({required this.room, super.key});
+  const RoomDashboardPage({
+    required this.room,
+    required this.currentUserId,
+    required this.currentUserDisplayName,
+    required this.roomRepository,
+    required this.expenseRepository,
+    super.key,
+  });
 
-  final RoomMock room;
+  final Room room;
+  final String currentUserId;
+  final String currentUserDisplayName;
+  final RoomRepository roomRepository;
+  final ExpenseRepository expenseRepository;
 
   @override
   State<RoomDashboardPage> createState() => _RoomDashboardPageState();
 }
 
 class _RoomDashboardPageState extends State<RoomDashboardPage> {
-  late List<ExpenseMock> _expenses;
+  late final ExpenseCubit _expenseCubit;
+  late Future<List<RoomMember>> _membersFuture;
+  bool _creatingInvite = false;
 
   @override
   void initState() {
     super.initState();
-    _expenses = List.of(
-      widget.room.currency == 'MYR' ? householdExpenses : japanExpenses,
-    );
+    _expenseCubit = ExpenseCubit(widget.expenseRepository)
+      ..loadExpenses(widget.room.id);
+    _membersFuture = widget.roomRepository.getRoomMembers(widget.room.id);
+  }
+
+  @override
+  void dispose() {
+    _expenseCubit.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final today = _expenses
-        .where((expense) => expense.dateGroup == 'Today')
-        .toList();
+    return BlocProvider.value(
+      value: _expenseCubit,
+      child: BlocBuilder<ExpenseCubit, ExpenseState>(
+        builder: (context, state) => FutureBuilder<List<RoomMember>>(
+          future: _membersFuture,
+          builder: (context, memberSnapshot) => _buildDashboard(
+            context,
+            state,
+            memberSnapshot.data ?? const [],
+            memberSnapshot,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDashboard(
+    BuildContext context,
+    ExpenseState state,
+    List<RoomMember> members,
+    AsyncSnapshot<List<RoomMember>> memberSnapshot,
+  ) {
+    final nameById = {
+      for (final member in members) member.userId: member.displayName,
+    };
+    final today = state.expenses.where((expense) {
+      final date = expense.expenseDate;
+      final now = DateTime.now();
+      return date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
+    final total = state.expenses.fold<int>(
+      0,
+      (sum, expense) => sum + expense.amountInCents,
+    );
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -47,18 +110,20 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                 ),
               ),
             ),
-            if (widget.room.live) ...[
-              const SizedBox(width: 8),
-              const StatusPill(label: 'Live', color: AppColors.paleCyan),
-            ],
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Room members',
-            onPressed: () => _openSection('Members'),
-            icon: const Icon(Icons.groups_2_outlined),
-          ),
+          if (widget.room.ownerId == widget.currentUserId)
+            TextButton.icon(
+              onPressed: _creatingInvite ? null : _showInviteCode,
+              icon: _creatingInvite
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.mail_outline_rounded),
+              label: const Text('Invite'),
+            ),
         ],
       ),
       body: ListView(
@@ -86,7 +151,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  widget.room.total,
+                  _money(total / 100),
                   style: const TextStyle(
                     fontSize: 33,
                     fontWeight: FontWeight.w800,
@@ -105,11 +170,18 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                       _Metric(
                         label: 'Today',
                         value: _money(
-                          today.fold(0, (sum, expense) => sum + expense.amount),
+                          today.fold<int>(
+                                0,
+                                (sum, expense) => sum + expense.amountInCents,
+                              ) /
+                              100,
                         ),
                       ),
-                      const _Metric(label: 'Members', value: '4 active'),
-                      const _Metric(label: 'Daily avg', value: 'RM 84.20'),
+                      _Metric(label: 'Members', value: '${members.length}'),
+                      _Metric(
+                        label: 'Expenses',
+                        value: '${state.expenses.length}',
+                      ),
                     ],
                   ),
                 ),
@@ -119,12 +191,11 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                     for (final action in const [
                       _QuickAction('Members', Icons.groups_outlined),
                       _QuickAction('Settle', Icons.call_split_rounded),
-                      _QuickAction('Activity', Icons.dynamic_feed_outlined),
                       _QuickAction('Stats', Icons.bar_chart_rounded),
                     ])
                       Expanded(
                         child: InkWell(
-                          onTap: () => _openSection(action.label),
+                          onTap: () => _openSection(action.label, members),
                           borderRadius: BorderRadius.circular(12),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 5),
@@ -162,98 +233,63 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
             ),
           ),
           const SizedBox(height: 12),
-          Material(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(13),
-            child: InkWell(
-              onTap: () => _openSection('Activity'),
-              borderRadius: BorderRadius.circular(13),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 13,
-                  vertical: 12,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(13),
-                ),
-                child: Row(
-                  children: [
-                    Container(width: 3, height: 34, color: AppColors.cyan),
-                    const SizedBox(width: 9),
-                    const MemberAvatar(
-                      name: 'John Tan',
-                      size: 32,
-                      color: AppColors.paleCyan,
-                    ),
-                    const SizedBox(width: 9),
-                    const Expanded(
-                      child: Text(
-                        'John just added 🚆 Shinkansen tickets',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    Text(
-                      _money(widget.room.currency == 'JPY' ? 3200 : 18),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
+          if (state.errorMessage != null)
+            SurfaceCard(
+              child: Column(
+                children: [
+                  Text(state.errorMessage!, textAlign: TextAlign.center),
+                  TextButton.icon(
+                    onPressed: () => _expenseCubit.loadExpenses(widget.room.id),
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                  ),
+                ],
               ),
             ),
-          ),
           const SizedBox(height: 20),
           SectionHeading(
-            'Today’s expenses',
+            "Today's expenses",
             trailing: TextButton(
-              onPressed: () => _openSection('History'),
+              onPressed: () => _openSection('History', members),
               child: const Text('View all'),
             ),
           ),
           const SizedBox(height: 5),
-          if (today.isEmpty)
+          // loading state
+          if (state.isLoading && state.expenses.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (state.expenses.isEmpty && state.errorMessage == null)
             const _RoomEmptyState()
           else
             for (final expense in today.take(4)) ...[
-              _ExpenseTile(
+              _FirestoreExpenseTile(
                 expense: expense,
-                amount: _money(expense.amount),
-                onTap: () => _openExpense(expense),
+                amount: _money(expense.amountInCents / 100),
+                paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
+                onTap: () => _openExpense(expense, members),
               ),
               const SizedBox(height: 8),
             ],
+          if (!state.isLoading && state.expenses.isNotEmpty && today.isEmpty)
+            const Text(
+              'No expenses today',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.muted),
+            ),
           const SizedBox(height: 16),
-          const SectionHeading(
-            'Who’s in this room',
+          SectionHeading(
+            "Who's in this room",
             trailing: StatusPill(
-              label: '4 members',
+              label: '${members.length} members',
               color: AppColors.paleBlue,
               textColor: Colors.grey,
             ),
           ),
           const SizedBox(height: 11),
-          SurfaceCard(
-            onTap: () => _openSection('Members'),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(
-              children: [
-                AvatarStack(names: widget.room.members),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Eric, John, Amy and David',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
-              ],
-            ),
-          ),
+          _membersCard(memberSnapshot, members),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -269,7 +305,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     );
   }
 
-  String get _periodLabel => 'Oct 1 – Oct 31';
+  String get _periodLabel => 'All time';
 
   String _money(double amount) {
     switch (widget.room.currency) {
@@ -282,49 +318,657 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     }
   }
 
+  Widget _membersCard(
+    AsyncSnapshot<List<RoomMember>> snapshot,
+    List<RoomMember> members,
+  ) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const SurfaceCard(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (snapshot.hasError) {
+      return SurfaceCard(
+        child: Column(
+          children: [
+            const Text('Unable to load room members.'),
+            TextButton(
+              onPressed: () => setState(
+                () => _membersFuture = widget.roomRepository.getRoomMembers(
+                  widget.room.id,
+                ),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (members.isEmpty) {
+      return const SurfaceCard(child: Text('No members found in this room.'));
+    }
+    return SurfaceCard(
+      onTap: () => _openMembers(members),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          AvatarStack(
+            names: members.map((member) => member.displayName).toList(),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              members.map((member) => member.displayName).join(', '),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ],
+      ),
+    );
+  }
+
   Future<void> _addExpense() async {
-    final expense = await Navigator.of(context).push<ExpenseMock>(
-      MaterialPageRoute<ExpenseMock>(
-        builder: (_) => AddExpensePage(room: widget.room),
+    final members = await _membersFuture;
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider.value(
+          value: _expenseCubit,
+          child: AddExpensePage(
+            room: widget.room,
+            members: members,
+            currentUserId: widget.currentUserId,
+            currentUserDisplayName: widget.currentUserDisplayName,
+          ),
+        ),
       ),
     );
-    if (expense != null) {
-      setState(() => _expenses.insert(0, expense));
-      if (mounted) _message('Expense added to ${widget.room.name}.');
-    }
   }
 
-  Future<void> _openExpense(ExpenseMock expense) async {
-    final result = await Navigator.of(context).push<ExpenseDetailResult>(
-      MaterialPageRoute<ExpenseDetailResult>(
-        builder: (_) => ExpenseDetailPage(room: widget.room, expense: expense),
+  Future<void> _openExpense(Expense expense, List<RoomMember> members) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => BlocProvider.value(
+          value: _expenseCubit,
+          child: ExpenseDetailPage(
+            room: widget.room,
+            expense: expense,
+            members: members,
+            currentUserId: widget.currentUserId,
+            currentUserDisplayName: widget.currentUserDisplayName,
+          ),
+        ),
       ),
     );
-    if (result == null) return;
-    setState(() {
-      if (result.deleted) {
-        _expenses.remove(expense);
-      } else if (result.updated != null) {
-        final index = _expenses.indexOf(expense);
-        if (index >= 0) _expenses[index] = result.updated!;
-      }
-    });
-    if (mounted && result.deleted) {
-      _message('Expense removed from this preview.');
-    }
-    if (mounted && result.updated != null) _message('Expense changes saved.');
   }
 
-  void _openSection(String section) {
+  void _openMembers(List<RoomMember> members) {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => RoomSectionPage(room: widget.room, section: section),
+        builder: (_) =>
+            _RoomMembersPage(roomName: widget.room.name, members: members),
       ),
     );
   }
 
-  void _message(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  Future<void> _showInviteCode() async {
+    setState(() => _creatingInvite = true);
+    try {
+      final invite = await widget.roomRepository.createInvite(
+        roomId: widget.room.id,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Invite people'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Share this code to invite people to ${widget.room.name}.'),
+              const SizedBox(height: 16),
+              SelectableText(
+                invite.inviteCode,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Expires ${_formatInviteExpiry(invite.expiresAt)}',
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: invite.inviteCode));
+                if (!dialogContext.mounted || !mounted) return;
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invite code copied.')),
+                );
+              },
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('Copy code'),
+            ),
+          ],
+        ),
+      );
+    } on RoomFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('Unable to create an invite code.')),
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _creatingInvite = false);
+    }
+  }
+
+  String _formatInviteExpiry(DateTime value) {
+    final local = value.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$day/$month/${local.year} at $hour:$minute';
+  }
+
+  void _openSection(String section, List<RoomMember> members) {
+    if (section == 'Members') {
+      _openMembers(members);
+      return;
+    }
+    if (section == 'History') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => BlocProvider.value(
+            value: _expenseCubit,
+            child: _RoomExpenseHistoryPage(
+              room: widget.room,
+              members: members,
+              currentUserId: widget.currentUserId,
+              currentUserDisplayName: widget.currentUserDisplayName,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    if (section == 'Stats') {
+      Navigator.of(context).push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => BlocProvider.value(
+            value: _expenseCubit,
+            child: _RoomStatisticsPage(
+              room: widget.room,
+              membersFuture: _membersFuture,
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final total = _expenseCubit.state.expenses.fold<int>(
+      0,
+      (sum, expense) => sum + expense.amountInCents,
+    );
+    final mockRoom = RoomMock(
+      name: widget.room.name,
+      subtitle: widget.room.description ?? 'Shared room',
+      emoji: '🏠',
+      currency: widget.room.currency ?? 'MYR',
+      total: _money(total / 100),
+      members: members
+          .map((member) => member.displayName.split(' ').first)
+          .toList(),
+    );
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => RoomSectionPage(room: mockRoom, section: section),
+      ),
+    );
+  }
+}
+
+class _RoomMembersPage extends StatelessWidget {
+  const _RoomMembersPage({required this.roomName, required this.members});
+
+  final String roomName;
+  final List<RoomMember> members;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('$roomName members')),
+      body: members.isEmpty
+          ? const Center(child: Text('No members found in this room.'))
+          : ListView(
+              padding: const EdgeInsets.all(18),
+              children: [
+                for (final member in members) ...[
+                  SurfaceCard(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        MemberAvatar(
+                          name: member.displayName,
+                          size: 42,
+                          color: member.isOwner
+                              ? AppColors.paleBlue
+                              : AppColors.paleCyan,
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                member.displayName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (member.email != null)
+                                Text(
+                                  member.email!,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        StatusPill(label: member.isOwner ? 'Owner' : 'Member'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _RoomExpenseHistoryPage extends StatelessWidget {
+  const _RoomExpenseHistoryPage({
+    required this.room,
+    required this.members,
+    required this.currentUserId,
+    required this.currentUserDisplayName,
+  });
+
+  final Room room;
+  final List<RoomMember> members;
+  final String currentUserId;
+  final String currentUserDisplayName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('${room.name} expenses')),
+      body: BlocBuilder<ExpenseCubit, ExpenseState>(
+        builder: (context, state) {
+          if (state.isLoading && state.expenses.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.errorMessage != null && state.expenses.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(state.errorMessage!),
+                  TextButton(
+                    onPressed: () =>
+                        context.read<ExpenseCubit>().loadExpenses(room.id),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+          if (state.expenses.isEmpty) {
+            return const Center(child: Text('No expenses yet.'));
+          }
+          final nameById = {
+            for (final member in members) member.userId: member.displayName,
+          };
+          return ListView.separated(
+            padding: const EdgeInsets.all(18),
+            itemCount: state.expenses.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final expense = state.expenses[index];
+              return _FirestoreExpenseTile(
+                expense: expense,
+                amount: _formatExpenseMoney(
+                  room.currency,
+                  expense.amountInCents,
+                ),
+                paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
+                onTap: () => Navigator.of(context).push<void>(
+                  MaterialPageRoute<void>(
+                    builder: (_) => BlocProvider.value(
+                      value: context.read<ExpenseCubit>(),
+                      child: ExpenseDetailPage(
+                        room: room,
+                        expense: expense,
+                        members: members,
+                        currentUserId: currentUserId,
+                        currentUserDisplayName: currentUserDisplayName,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RoomStatisticsPage extends StatelessWidget {
+  const _RoomStatisticsPage({required this.room, required this.membersFuture});
+
+  final Room room;
+  final Future<List<RoomMember>> membersFuture;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('${room.name} stats')),
+      body: BlocBuilder<ExpenseCubit, ExpenseState>(
+        builder: (context, state) {
+          if (state.isLoading && state.expenses.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.errorMessage != null && state.expenses.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(state.errorMessage!),
+                  TextButton(
+                    onPressed: () =>
+                        context.read<ExpenseCubit>().loadExpenses(room.id),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final now = DateTime.now();
+          final monthExpenses = state.expenses
+              .where(
+                (expense) =>
+                    expense.expenseDate.year == now.year &&
+                    expense.expenseDate.month == now.month,
+              )
+              .toList();
+          final totalInCents = monthExpenses.fold<int>(
+            0,
+            (sum, expense) => sum + expense.amountInCents,
+          );
+          final totalsByCategory = <String, int>{};
+          for (final expense in monthExpenses) {
+            totalsByCategory.update(
+              expense.category,
+              (total) => total + expense.amountInCents,
+              ifAbsent: () => expense.amountInCents,
+            );
+          }
+          final categories = totalsByCategory.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value));
+
+          return FutureBuilder<List<RoomMember>>(
+            future: membersFuture,
+            builder: (context, memberSnapshot) {
+              final members = memberSnapshot.data ?? const <RoomMember>[];
+              final memberTotals = <String, int>{
+                for (final member in members) member.userId: 0,
+              };
+              for (final expense in monthExpenses) {
+                memberTotals.update(
+                  expense.paidByUserId,
+                  (total) => total + expense.amountInCents,
+                  ifAbsent: () => expense.amountInCents,
+                );
+              }
+              final memberNames = {
+                for (final member in members) member.userId: member.displayName,
+              };
+              final sortedMemberTotals = memberTotals.entries.toList()
+                ..sort((a, b) => b.value.compareTo(a.value));
+              const categoryColors = [
+                AppColors.primary,
+                AppColors.secondary,
+                AppColors.cyan,
+                AppColors.success,
+                AppColors.danger,
+              ];
+
+              return ListView(
+                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+                children: [
+                  SurfaceCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total spending in ${_monthName(now.month)}',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _formatExpenseMoney(room.currency, totalInCents),
+                          style: const TextStyle(
+                            fontSize: 31,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${monthExpenses.length} ${monthExpenses.length == 1 ? 'expense' : 'expenses'}',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const SectionHeading('Spending by category'),
+                  const SizedBox(height: 10),
+                  if (categories.isEmpty)
+                    const SurfaceCard(child: Text('No expenses this month.'))
+                  else
+                    SurfaceCard(
+                      child: Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < categories.length;
+                            index++
+                          ) ...[
+                            if (index > 0) const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.paleBlue,
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    categoryEmoji(categories[index].key),
+                                    style: const TextStyle(fontSize: 17),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    categories[index].key,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${(categories[index].value * 100 / totalInCents).round()}%',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  _formatExpenseMoney(
+                                    room.currency,
+                                    categories[index].value,
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(5),
+                              child: LinearProgressIndicator(
+                                value: categories[index].value / totalInCents,
+                                color:
+                                    categoryColors[index %
+                                        categoryColors.length],
+                                backgroundColor: AppColors.paleBlue,
+                                minHeight: 7,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 16),
+                  const SectionHeading('Paid by member'),
+                  const SizedBox(height: 10),
+                  if (memberSnapshot.connectionState == ConnectionState.waiting)
+                    const SurfaceCard(
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (memberSnapshot.hasError)
+                    const SurfaceCard(
+                      child: Text('Unable to load room members.'),
+                    )
+                  else if (sortedMemberTotals.isEmpty)
+                    const SurfaceCard(child: Text('No members found.'))
+                  else
+                    SurfaceCard(
+                      child: Column(
+                        children: [
+                          for (final entry in sortedMemberTotals) ...[
+                            Row(
+                              children: [
+                                MemberAvatar(
+                                  name: memberNames[entry.key] ?? 'Unknown',
+                                  size: 30,
+                                  color: AppColors.paleBlue,
+                                  border: false,
+                                ),
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Text(
+                                    memberNames[entry.key] ?? 'Unknown member',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  _formatExpenseMoney(
+                                    room.currency,
+                                    entry.value,
+                                  ),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (entry.key != sortedMemberTotals.last.key)
+                              const SizedBox(height: 12),
+                          ],
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+String _monthName(int month) => const [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+][month - 1];
+
+String _formatExpenseMoney(String? currency, int amountInCents) {
+  final amount = amountInCents / 100;
+  switch (currency) {
+    case 'JPY':
+      return '¥${amount.toStringAsFixed(0)}';
+    case 'THB':
+      return '฿${amount.toStringAsFixed(0)}';
+    default:
+      return formatMoney(amount);
   }
 }
 
@@ -353,10 +997,10 @@ class _RoomSectionPageState extends State<RoomSectionPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
         children: switch (widget.section) {
+          // member page
           'Members' => _members(),
+          // settle page
           'Settle' => _settlements(),
-          'Activity' => _activity(),
-          'Stats' => _statistics(),
           _ => _history(),
         },
       ),
@@ -533,93 +1177,6 @@ class _RoomSectionPageState extends State<RoomSectionPage> {
     ],
   ];
 
-  List<Widget> _activity() => [
-    for (final item in const [
-      (
-        'John added Food',
-        'RM 20.00 · Lunch at the market',
-        '12 min ago',
-        Icons.add_shopping_cart_rounded,
-        AppColors.primary,
-      ),
-      (
-        'Amy joined the room',
-        'Monthly Household',
-        '2 hours ago',
-        Icons.person_add_alt_rounded,
-        AppColors.secondary,
-      ),
-      (
-        'Eric edited Hotel',
-        'RM 180.00 · corrected amount',
-        'Yesterday',
-        Icons.edit_outlined,
-        AppColors.cyan,
-      ),
-      (
-        'John deleted Coffee',
-        'RM 12.00 · duplicate entry',
-        'Yesterday',
-        Icons.delete_outline_rounded,
-        AppColors.danger,
-      ),
-      (
-        'Amy marked settlement as paid',
-        'Eric received RM 30.00',
-        'Oct 3',
-        Icons.check_circle_outline_rounded,
-        AppColors.success,
-      ),
-    ]) ...[
-      Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: const BoxDecoration(
-              color: AppColors.paleBlue,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(item.$4, size: 18, color: item.$5),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: SurfaceCard(
-              padding: const EdgeInsets.all(13),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.$1,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.$2,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    item.$3,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 10),
-    ],
-  ];
-
   List<Widget> _history() {
     final expenses = widget.room.currency == 'MYR'
         ? householdExpenses
@@ -659,12 +1216,7 @@ class _RoomSectionPageState extends State<RoomSectionPage> {
             _ExpenseTile(
               expense: expense,
               amount: _money(expense.amount),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      ExpenseDetailPage(room: widget.room, expense: expense),
-                ),
-              ),
+              onTap: () => _message('Open room history to manage expenses.'),
             ),
             const SizedBox(height: 8),
           ],
@@ -672,95 +1224,6 @@ class _RoomSectionPageState extends State<RoomSectionPage> {
       ],
     ];
   }
-
-  List<Widget> _statistics() => [
-    SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Total spending this month',
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            widget.room.total,
-            style: const TextStyle(fontSize: 31, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 15),
-          const Text(
-            'Spending by category',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 14),
-          for (final row in const [
-            ('Food', 0.78, AppColors.primary),
-            ('Transport', 0.52, AppColors.secondary),
-            ('Travel', 0.4, AppColors.cyan),
-            ('Shopping', 0.25, Color(0xFFCBD4F7)),
-          ]) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Text(row.$1, style: const TextStyle(fontSize: 13)),
-                ),
-                Text(
-                  '${(row.$2 * 100).round()}%',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(5),
-              child: LinearProgressIndicator(
-                value: row.$2,
-                color: row.$3,
-                backgroundColor: AppColors.paleBlue,
-                minHeight: 7,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ],
-      ),
-    ),
-    const SizedBox(height: 14),
-    SurfaceCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'By member',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 12),
-          for (final member in roomMembers) ...[
-            Row(
-              children: [
-                MemberAvatar(
-                  name: member.name,
-                  size: 27,
-                  color: member.color,
-                  border: false,
-                ),
-                const SizedBox(width: 8),
-                Expanded(child: Text(member.name.split(' ').first)),
-                Text(
-                  _money(member.spending),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-          ],
-        ],
-      ),
-    ),
-  ];
 
   void _markPaid(String name) async {
     final confirmed = await showDialog<bool>(
@@ -927,6 +1390,77 @@ class _ExpenseTile extends StatelessWidget {
                 style: TextStyle(fontSize: 9, color: AppColors.muted),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirestoreExpenseTile extends StatelessWidget {
+  const _FirestoreExpenseTile({
+    required this.expense,
+    required this.amount,
+    required this.paidByName,
+    required this.onTap,
+  });
+
+  final Expense expense;
+  final String amount;
+  final String paidByName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final description = expense.note?.trim();
+    return SurfaceCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.paleBlue,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              categoryEmoji(expense.category),
+              style: const TextStyle(fontSize: 20),
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  description == null || description.isEmpty
+                      ? expense.category
+                      : description,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  'Paid by $paidByName · ${formatShortDate(expense.expenseDate)}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            amount,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ],
       ),

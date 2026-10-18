@@ -75,6 +75,16 @@ class _ProfilePageState extends State<ProfilePage> {
                               color: AppColors.muted,
                             ),
                           ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'UID: ${widget.user?.uid ?? 'Unavailable'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.muted,
+                            ),
+                          ),
                         ],
                       ),
                     ),

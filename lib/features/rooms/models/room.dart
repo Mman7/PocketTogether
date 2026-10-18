@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Room {
   final String id;
   final String name;
@@ -6,6 +8,7 @@ class Room {
   final String? description;
   final String? currency;
   final String? ownerId;
+  final List<String> memberIds;
 
   const Room({
     required this.id,
@@ -15,7 +18,10 @@ class Room {
     this.description,
     this.currency,
     this.ownerId,
+    this.memberIds = const [],
   });
+
+  String? get createdBy => ownerId;
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,6 +32,8 @@ class Room {
       'createdAt': createdAt?.toIso8601String(),
       'currency': currency,
       'ownerId': ownerId,
+      'createdBy': ownerId,
+      'memberIds': memberIds,
     };
   }
 
@@ -33,15 +41,20 @@ class Room {
     return Room(
       id: id,
       name: data['name'] as String,
-      createdAt: data['createdAt'] != null
-          ? DateTime.parse(data['createdAt'] as String)
-          : null,
-      updatedAt: data['updatedAt'] != null
-          ? DateTime.parse(data['updatedAt'] as String)
-          : null,
+      createdAt: _parseDate(data['createdAt']),
+      updatedAt: _parseDate(data['updatedAt']),
       description: data['description'] as String?,
       currency: data['currency'] as String?,
-      ownerId: data['ownerId'] as String?,
+      ownerId: data['createdBy'] as String? ?? data['ownerId'] as String?,
+      memberIds:
+          (data['memberIds'] as List<dynamic>?)?.cast<String>() ?? const [],
     );
+  }
+
+  static DateTime? _parseDate(Object? value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_together/features/profile/models/user.dart';
 import 'package:pocket_together/features/rooms/data/room_repository.dart';
 import 'package:pocket_together/features/rooms/models/room.dart';
+import 'package:pocket_together/features/rooms/models/room_role.dart';
 
 import '../../support/test_app.dart';
 
@@ -115,10 +116,17 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Your room is ready'), findsOneWidget);
-    expect(find.text('generated-room-id'), findsOneWidget);
-    expect(find.text('FLOW-72MX'), findsOneWidget);
+    expect(find.text('ABCD2345'), findsOneWidget);
     expect(harness.roomRepository.requestedName, 'Weekend in Penang');
     expect(harness.roomRepository.requestedCurrency, 'MYR');
+    expect(
+      harness.roomRepository.roomMembers['generated-room-id']!.single.userId,
+      'test-user',
+    );
+    expect(
+      harness.roomRepository.roomMembers['generated-room-id']!.single.role,
+      RoomRole.owner,
+    );
     await tester.tap(find.byTooltip('Close'));
     await tester.pumpAndSettle();
     expect(find.text('Weekend in Penang'), findsOneWidget);
@@ -164,20 +172,18 @@ void main() {
     await tester.tap(find.text('Join room'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'BAD123');
-    await tester.enterText(find.byType(TextFormField).at(1), 'TOKYO24');
     await tester.tap(find.text('Join room').last);
     await tester.pumpAndSettle();
     expect(
-      find.text('We couldn’t find that room code. Check it and try again.'),
+      find.text('That invite code is invalid. Check it and try again.'),
       findsOneWidget,
     );
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'JP4K8D');
-    await tester.enterText(find.byType(TextFormField).at(1), 'EXPIRED');
+    await tester.enterText(find.byType(TextFormField).at(0), 'EXPIRED');
     await tester.tap(find.text('Join room').last);
     await tester.pumpAndSettle();
     expect(
-      find.text('This invite has expired. Ask for a new one.'),
+      find.text('That invite code is invalid. Check it and try again.'),
       findsOneWidget,
     );
   });

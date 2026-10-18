@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_together/features/rooms/models/room_member.dart';
+import 'package:pocket_together/features/rooms/models/room_role.dart';
 import 'package:pocket_together/features/rooms/models/room.dart';
 
 import '../../support/test_app.dart';
 
 Future<void> _pumpWithJapanRoom(WidgetTester tester) async {
-  final harness = TestAppHarness(signedIn: true);
-  harness.roomRepository.rooms.add(
-    const Room(
-      id: 'japan-room',
-      name: 'Japan Trip',
-      description: 'Tokyo & Kyoto Autumn',
-      currency: 'JPY',
-      ownerId: 'test-user',
-    ),
-  );
+  final harness = await _harnessWithJapanRoom();
   await pumpTestApp(tester, harness);
 }
 
@@ -82,11 +75,92 @@ void main() {
     await tester.enterText(amountField, '12.50');
     expect(tester.widget<TextField>(amountField).controller!.text, '12.50');
 
-    await tester.tap(find.text('4 members'));
+    expect(find.text('2 selected'), findsOneWidget);
+    tester.testTextInput.hide();
     await tester.pumpAndSettle();
-    expect(find.text('Just me'), findsOneWidget);
-    await tester.tap(find.text('Just me'));
+    final secondMember = find.byType(CheckboxListTile).last;
+    await tester.drag(find.byType(ListView).first, const Offset(0, -240));
     await tester.pumpAndSettle();
-    expect(find.text('Just me'), findsOneWidget);
+    await tester.ensureVisible(secondMember);
+    await tester.tap(secondMember);
+    await tester.pumpAndSettle();
+    expect(find.text('1 selected'), findsOneWidget);
   });
+
+  testWidgets('creates expense with member IDs and exact split cents', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final harness = await _harnessWithJapanRoom();
+    await pumpTestApp(tester, harness);
+
+    await tester.tap(find.text('Japan Trip'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add expense'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('expense-amount')),
+      '10.01',
+    );
+    await tester.enterText(find.byType(TextField).last, 'Shared lunch');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    final saved =
+        harness.expenseRepository.expensesByRoom['japan-room']!.single;
+    expect(saved.amountInCents, 1001);
+    expect(saved.paidByUserId, 'test-user');
+    expect(saved.createdByUserId, 'test-user');
+    expect(saved.splitAmountsInCents, {'test-user': 501, 'member-2': 500});
+    expect(find.text('Shared lunch'), findsOneWidget);
+
+    await tester.tap(find.text('Shared lunch'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit expense'));
+    await tester.pumpAndSettle();
+    final noteField = find.byType(TextField).last;
+    await tester.enterText(noteField, 'Updated lunch');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.text('Updated lunch'), findsOneWidget);
+    expect(
+      harness.expenseRepository.expensesByRoom['japan-room']!.single.note,
+      'Updated lunch',
+    );
+
+    await tester.tap(find.text('Delete expense'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    expect(harness.expenseRepository.expensesByRoom['japan-room'], isEmpty);
+  });
+}
+
+Future<TestAppHarness> _harnessWithJapanRoom() async {
+  final harness = TestAppHarness(signedIn: true);
+  harness.roomRepository.rooms.add(
+    const Room(
+      id: 'japan-room',
+      name: 'Japan Trip',
+      description: 'Tokyo & Kyoto Autumn',
+      currency: 'JPY',
+      ownerId: 'test-user',
+    ),
+  );
+  harness.roomRepository.roomMembers['japan-room'] = const [
+    RoomMember(
+      userId: 'test-user',
+      displayName: 'Alex Morgan',
+      role: RoomRole.owner,
+    ),
+    RoomMember(
+      userId: 'member-2',
+      displayName: 'Jamie Lee',
+      role: RoomRole.member,
+    ),
+  ];
+  return harness;
 }

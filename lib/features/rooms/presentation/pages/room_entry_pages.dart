@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
+import '../../models/room.dart';
 import '../cubit/room_cubit.dart';
 import '../cubit/room_state.dart';
 
 class CreateRoomPage extends StatefulWidget {
-  const CreateRoomPage({required this.ownerId, super.key});
-
-  final String ownerId;
+  const CreateRoomPage({super.key});
 
   @override
   State<CreateRoomPage> createState() => _CreateRoomPageState();
@@ -20,7 +19,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   String _currency = 'MYR';
-  String _expiration = '7 days';
 
   @override
   void dispose() {
@@ -31,16 +29,19 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<RoomCubit, RoomState>(
+      listenWhen: (previous, current) =>
+          (previous.createdRoom == null && current.createdRoom != null) ||
+          (previous.errorMessage == null && current.errorMessage != null),
       listener: (context, state) {
-        final room = state.createdRoom;
-        if (room != null) {
+        final created = state.createdRoom;
+        if (created != null) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute<void>(
               builder: (_) => RoomCreatedPage(
-                roomName: room.name,
-                roomId: room.id,
-                currency: room.currency ?? _currency,
-                expiration: _expiration,
+                roomName: created.room.name,
+                currency: created.room.currency ?? _currency,
+                inviteCode: created.invite.inviteCode,
+                expiresAt: created.invite.expiresAt,
               ),
             ),
           );
@@ -116,33 +117,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                             setState(() => _currency = value ?? _currency),
                       ),
                       const SizedBox(height: 14),
-                      DropdownButtonFormField<String>(
-                        initialValue: _expiration,
-                        decoration: const InputDecoration(
-                          labelText: 'Invite expires after',
-                          prefixIcon: Icon(Icons.timer_outlined),
-                        ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: '24 hours',
-                            child: Text('24 hours'),
-                          ),
-                          DropdownMenuItem(
-                            value: '7 days',
-                            child: Text('7 days'),
-                          ),
-                          DropdownMenuItem(
-                            value: '30 days',
-                            child: Text('30 days'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'Never',
-                            child: Text('Never'),
-                          ),
-                        ],
-                        onChanged: (value) =>
-                            setState(() => _expiration = value ?? _expiration),
-                      ),
                     ],
                   ),
                 ),
@@ -184,7 +158,6 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
   Future<void> _submit(BuildContext context) async {
     if (!_formKey.currentState!.validate()) return;
     await context.read<RoomCubit>().createRoom(
-      ownerId: widget.ownerId,
       name: _name.text.trim(),
       currency: _currency,
     );
@@ -194,16 +167,16 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
 class RoomCreatedPage extends StatelessWidget {
   const RoomCreatedPage({
     required this.roomName,
-    required this.roomId,
     required this.currency,
-    required this.expiration,
+    required this.inviteCode,
+    required this.expiresAt,
     super.key,
   });
 
   final String roomName;
-  final String roomId;
   final String currency;
-  final String expiration;
+  final String inviteCode;
+  final DateTime expiresAt;
 
   @override
   Widget build(BuildContext context) {
@@ -240,20 +213,62 @@ class RoomCreatedPage extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              '$roomName is set up. Share these codes with your crew.',
+              '$roomName is set up. Share this invite code with your group.',
               style: const TextStyle(color: AppColors.muted),
             ),
-            const SizedBox(height: 23),
-            _CodeCard(
-              label: 'ROOM CODE',
-              code: roomId,
-              helper: 'Use this to find your room',
-            ),
-            const SizedBox(height: 12),
-            _CodeCard(
-              label: 'INVITE CODE',
-              code: 'FLOW-72MX',
-              helper: 'Expires in $expiration',
+            const SizedBox(height: 18),
+            SurfaceCard(
+              padding: const EdgeInsets.all(17),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'INVITE CODE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          inviteCode,
+                          style: const TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton.filledTonal(
+                        tooltip: 'Copy invite code',
+                        onPressed: () async {
+                          await Clipboard.setData(
+                            ClipboardData(text: inviteCode),
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Invite code copied.'),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 18),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Expires ${_formatExpiry(expiresAt)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 18),
             SurfaceCard(
@@ -278,13 +293,6 @@ class RoomCreatedPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            PrimaryButton(
-              label: 'Share invite',
-              icon: Icons.ios_share_rounded,
-              onPressed: () =>
-                  _message(context, 'Invite details are ready to share.'),
-            ),
-            const SizedBox(height: 9),
             OutlinedButton.icon(
               onPressed: () =>
                   Navigator.popUntil(context, (route) => route.isFirst),
@@ -304,66 +312,10 @@ class RoomCreatedPage extends StatelessWidget {
   }
 }
 
-class _CodeCard extends StatelessWidget {
-  const _CodeCard({
-    required this.label,
-    required this.code,
-    required this.helper,
-  });
-
-  final String label;
-  final String code;
-  final String helper;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      padding: const EdgeInsets.all(17),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              color: AppColors.muted,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Row(
-            children: [
-              Expanded(
-                child: SelectableText(
-                  code,
-                  style: const TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              IconButton.filledTonal(
-                tooltip: 'Copy $label',
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: code));
-                  if (context.mounted) _message(context, '$label copied.');
-                },
-                icon: const Icon(Icons.copy_rounded, size: 18),
-              ),
-            ],
-          ),
-          Text(
-            helper,
-            style: const TextStyle(fontSize: 11, color: AppColors.muted),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class JoinRoomPage extends StatefulWidget {
-  const JoinRoomPage({super.key});
+  const JoinRoomPage({required this.onJoined, super.key});
+
+  final void Function(Room room) onJoined;
 
   @override
   State<JoinRoomPage> createState() => _JoinRoomPageState();
@@ -371,15 +323,12 @@ class JoinRoomPage extends StatefulWidget {
 
 class _JoinRoomPageState extends State<JoinRoomPage> {
   final _formKey = GlobalKey<FormState>();
-  final _roomCode = TextEditingController();
   final _inviteCode = TextEditingController();
-  String? _roomError;
   String? _inviteError;
   bool _loading = false;
 
   @override
   void dispose() {
-    _roomCode.dispose();
     _inviteCode.dispose();
     super.dispose();
   }
@@ -404,7 +353,7 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             ),
             const SizedBox(height: 5),
             const Text(
-              'Enter both codes from your room owner to join the shared ledger.',
+              'Enter the invite code shared by a room member.',
               style: TextStyle(fontSize: 13, color: AppColors.muted),
             ),
             const SizedBox(height: 21),
@@ -413,34 +362,20 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
               child: Column(
                 children: [
                   TextFormField(
-                    controller: _roomCode,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (_) => setState(() => _roomError = null),
-                    decoration: InputDecoration(
-                      labelText: 'Room code',
-                      hintText: 'e.g. JP4K8D',
-                      prefixIcon: const Icon(Icons.tag_rounded),
-                      errorText: _roomError,
-                    ),
-                    validator: (value) =>
-                        value == null || value.trim().length < 4
-                        ? 'Enter the room code from your invite'
-                        : null,
-                  ),
-                  const SizedBox(height: 13),
-                  TextFormField(
                     controller: _inviteCode,
                     textCapitalization: TextCapitalization.characters,
                     onChanged: (_) => setState(() => _inviteError = null),
                     decoration: InputDecoration(
                       labelText: 'Invite code',
-                      hintText: 'Enter your invite code',
+                      hintText: 'e.g. ABCD2345',
                       prefixIcon: const Icon(Icons.key_rounded),
                       errorText: _inviteError,
                     ),
                     validator: (value) =>
-                        value == null || value.trim().length < 4
-                        ? 'Enter the invite code from your owner'
+                        value == null ||
+                            !RegExp(r'^[A-Za-z0-9]{6,8}$')
+                                .hasMatch(value.trim())
+                        ? 'Enter the 8-character invite code'
                         : null,
                   ),
                 ],
@@ -455,23 +390,16 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Room codes help find the right group. Invite codes confirm you were invited.',
+                      'The invite code identifies the room and confirms you were invited.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
                 ],
               ),
             ),
-            if (_inviteCode.text.toUpperCase() == 'EXPIRED') ...[
-              const SizedBox(height: 12),
-              const _InlineError(
-                title: 'Invite expired',
-                message: 'Ask the room owner to send a fresh invite code.',
-              ),
-            ],
             const SizedBox(height: 22),
             PrimaryButton(
-              label: _loading ? 'Checking invite…' : 'Join room',
+              label: _loading ? 'Joining room…' : 'Join room',
               icon: _loading
                   ? Icons.hourglass_top_rounded
                   : Icons.login_rounded,
@@ -495,77 +423,35 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
     );
   }
 
-  void _join() {
+  Future<void> _join() async {
     if (!_formKey.currentState!.validate()) return;
-    final room = _roomCode.text.trim().toUpperCase();
-    final invite = _inviteCode.text.trim().toUpperCase();
-    if (room != 'JP4K8D') {
-      setState(
-        () => _roomError =
-            'We couldn’t find that room code. Check it and try again.',
-      );
-      return;
-    }
-    if (invite == 'EXPIRED') {
-      setState(
-        () => _inviteError = 'This invite has expired. Ask for a new one.',
-      );
-      return;
-    }
-    if (invite != 'TOKYO24') {
-      setState(
-        () => _inviteError =
-            'That invite code is invalid. Check with the room owner.',
-      );
-      return;
-    }
     setState(() => _loading = true);
-    Future<void>.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You joined Japan Trip in this preview.')),
+    try {
+      final cubit = context.read<RoomCubit>();
+      final result = await cubit.joinRoom(
+        inviteCode: _inviteCode.text.trim().toUpperCase(),
       );
+      if (!mounted) return;
+      if (result == null) {
+        setState(
+          () => _inviteError =
+              cubit.state.joinErrorMessage ?? 'Unable to join this room.',
+        );
+        return;
+      }
       Navigator.pop(context);
-    });
+      widget.onJoined(result.room);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }
 
-class _InlineError extends StatelessWidget {
-  const _InlineError({required this.title, required this.message});
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      color: const Color(0xFFFFF0F0),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.danger),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  message,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-void _message(BuildContext context, String text) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+String _formatExpiry(DateTime value) {
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$day/$month/${local.year} at $hour:$minute';
 }
