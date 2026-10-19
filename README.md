@@ -1,17 +1,45 @@
 # PocketTogether
 
-A new Flutter project.
+PocketTogether is a Flutter expense-sharing app backed by Firebase.
 
-## Getting Started
+## Room flow
 
-This project is a starting point for a Flutter application.
+Room creation, invite generation, and joining are handled by callable Functions:
 
-A few resources to get you started if this is your first Flutter project:
+- `createRoom` creates the room and its first seven-day invite.
+- `createRoomInvite` creates another seven-day invite for the owner.
+- `joinRoom` validates the invite and adds the signed-in user idempotently.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Room and invite writes are server-only. The client reads rooms through the signed-in user's `memberIds` membership query.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Local Firebase emulators
+
+Install the Firebase CLI and authenticate once with `firebase login`. From the repository root:
+
+```powershell
+firebase emulators:start
+```
+
+Run the Android app against the emulators with:
+
+```powershell
+flutter run --dart-define=USE_FIREBASE_EMULATORS=true
+```
+
+The configured emulator ports are Auth `9099`, Firestore `8080`, Functions `5001`, and the Emulator UI `4000`. Android uses `10.0.2.2` to reach the host machine.
+
+## Checks
+
+```powershell
+flutter analyze
+flutter test
+Push-Location functions
+npm test
+Pop-Location
+```
+
+Deploy callable Functions and Firestore rules only after reviewing the target Firebase project:
+
+```powershell
+firebase deploy --only functions,firestore:rules
+```
