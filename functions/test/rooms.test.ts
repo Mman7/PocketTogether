@@ -6,7 +6,10 @@ import { CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 import {
   createRoomHandler,
   createRoomInviteHandler,
+  deleteRoomHandler,
+  getRoomMembersHandler,
   joinRoomHandler,
+  removeRoomMemberHandler,
 } from '../src/rooms';
 
 type TestRequest = CallableRequest<Record<string, unknown>>;
@@ -37,6 +40,15 @@ test('room callables reject unauthenticated requests', async () => {
     'unauthenticated',
   );
   await expectHttpsError(joinRoomHandler(request({ inviteCode: 'ABCDEFGH' })), 'unauthenticated');
+  await expectHttpsError(deleteRoomHandler(request({ roomId: 'room-id' })), 'unauthenticated');
+  await expectHttpsError(
+    removeRoomMemberHandler(request({ roomId: 'room-id', memberId: 'member-id' })),
+    'unauthenticated',
+  );
+  await expectHttpsError(
+    getRoomMembersHandler(request({ roomId: 'room-id' })),
+    'unauthenticated',
+  );
 });
 
 test('createRoom validates the room name before accessing Firestore', async () => {
@@ -61,5 +73,19 @@ test('createRoomInvite requires a room id', async () => {
   await expectHttpsError(
     createRoomInviteHandler(request({}, 'owner-id')),
     'invalid-argument',
+  );
+});
+
+test('deleteRoom and removeRoomMember validate required ids', async () => {
+  await expectHttpsError(deleteRoomHandler(request({}, 'owner-id')), 'invalid-argument');
+  await expectHttpsError(
+    removeRoomMemberHandler(request({ roomId: 'room-id' }, 'owner-id')),
+    'invalid-argument',
+  );
+  await expectHttpsError(
+    removeRoomMemberHandler(
+      request({ roomId: 'room-id', memberId: 'owner-id' }, 'owner-id'),
+    ),
+    'failed-precondition',
   );
 });

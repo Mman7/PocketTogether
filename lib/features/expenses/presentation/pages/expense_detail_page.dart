@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/presentation/mock_data.dart' show formatMoney;
+import '../../../../shared/presentation/category_emoji.dart';
+import '../../../../shared/presentation/money_format.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../rooms/models/room.dart';
 import '../../../rooms/models/room_member.dart';
@@ -65,16 +66,20 @@ class ExpenseDetailPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    _emojiFor(currentExpense.category),
-                    style: const TextStyle(fontSize: 31),
+                  child: Icon(
+                    categoryIcon(currentExpense.category),
+                    size: 31,
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(height: 12),
                 StatusPill(label: currentExpense.category),
                 const SizedBox(height: 6),
                 Text(
-                  _money(currentExpense.amountInCents / 100),
+                  formatCurrency(
+                    currentExpense.amountInCents,
+                    currency: room.currency,
+                  ),
                   style: const TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.w800,
@@ -214,17 +219,6 @@ class ExpenseDetailPage extends StatelessWidget {
     );
   }
 
-  String _money(double amount) {
-    switch (room.currency) {
-      case 'JPY':
-        return '¥${amount.toStringAsFixed(0)}';
-      case 'THB':
-        return '฿${amount.toStringAsFixed(0)}';
-      default:
-        return formatMoney(amount);
-    }
-  }
-
   String _month(int month) => const [
     'Jan',
     'Feb',
@@ -244,16 +238,9 @@ class ExpenseDetailPage extends StatelessWidget {
     for (final member in members) {
       if (member.userId == userId) return member.displayName;
     }
-    return userId == currentUserId ? currentUserDisplayName : 'Unknown member';
+    if (userId == currentUserId) return currentUserDisplayName;
+    return 'Unknown member';
   }
-
-  String _emojiFor(String category) => switch (category) {
-    'Food' || 'Coffee' || 'Drinks' => '🍜',
-    'Transport' || 'Taxi' => '🚆',
-    'Hotel' || 'Travel' => '🏨',
-    'Transfer' => '↔️',
-    _ => '📦',
-  };
 
   Future<void> _edit(BuildContext context, Expense currentExpense) async {
     await Navigator.of(context).push<void>(

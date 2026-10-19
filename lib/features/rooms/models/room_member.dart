@@ -18,12 +18,16 @@ class RoomMember {
   bool get isOwner => role == RoomRole.owner;
 
   factory RoomMember.fromMap(String userId, Map<String, dynamic> data) {
+    final rawJoinedAt = data['joinedAt'];
+    final joinedAt = rawJoinedAt is String
+        ? DateTime.tryParse(rawJoinedAt)
+        : (rawJoinedAt as dynamic)?.toDate() as DateTime?;
     return RoomMember(
       userId: userId,
       displayName: data['displayName'] as String? ?? 'Unknown',
       email: data['email'] as String?,
       role: data['role'] == 'owner' ? RoomRole.owner : RoomRole.member,
-      joinedAt: (data['joinedAt'] as dynamic)?.toDate(),
+      joinedAt: joinedAt,
     );
   }
 
@@ -32,7 +36,6 @@ class RoomMember {
       'userId': userId,
       'displayName': displayName,
       if (email != null) 'email': email,
-      'role': role.name,
       'joinedAt': joinedAt,
     };
   }

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pocket_together/features/profile/presentation/cubit/profile_state.dart';
 
 import '../../../../app/theme/app_theme.dart';
+import '../../../../shared/presentation/money_format.dart';
 import '../../../auth/models/auth_user.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../expenses/data/expense_repository.dart';
@@ -11,6 +12,8 @@ import '../../../profile/data/profile_repository.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../data/room_repository.dart';
+import '../cubit/room_ledger_cubit.dart';
+import '../cubit/room_ledger_state.dart';
 import '../cubit/room_cubit.dart';
 import '../cubit/room_state.dart';
 import '../../models/room.dart';
@@ -41,17 +44,23 @@ class RoomsPage extends StatefulWidget {
 class _RoomsPageState extends State<RoomsPage> {
   int _selectedTab = 0;
   late final RoomCubit _roomCubit;
+  late final RoomLedgerCubit _ledgerCubit;
 
   @override
   void initState() {
     super.initState();
     _roomCubit = RoomCubit(widget.roomRepository)
       ..loadRooms(widget.currentUser?.uid);
+    _ledgerCubit = RoomLedgerCubit(
+      roomRepository: widget.roomRepository,
+      expenseRepository: widget.expenseRepository,
+    );
   }
 
   @override
   void dispose() {
     _roomCubit.close();
+    _ledgerCubit.close();
     super.dispose();
   }
 
@@ -65,49 +74,69 @@ class _RoomsPageState extends State<RoomsPage> {
                 ..load(widget.currentUser?.uid),
         ),
         BlocProvider<RoomCubit>.value(value: _roomCubit),
+        BlocProvider<RoomLedgerCubit>.value(value: _ledgerCubit),
       ],
-      child: BlocBuilder<ProfileCubit, ProfileState>(
-        builder: (context, state) {
-          final profileName = state.profile?.displayName.trim();
-          final authName = widget.currentUser?.displayName?.trim();
-          final emailName = widget.currentUser?.email?.trim().split('@').first;
-          final displayName = switch (true) {
-            _ when profileName?.isNotEmpty == true => profileName!,
-            _ when authName?.isNotEmpty == true => authName!,
-            _ when emailName?.isNotEmpty == true => emailName!,
-            _ => 'there',
-          };
-          final selectedPage = switch (_selectedTab) {
-            0 => BlocBuilder<RoomCubit, RoomState>(
-              builder: (context, roomState) =>
-                  _buildRooms(displayName, roomState),
-            ),
-            1 => const HistoryPage(),
-            2 => const StatisticsPage(),
-            _ => ProfilePage(
-              user: widget.currentUser,
-              onSignOut: widget.onSignOut,
-            ),
-          };
-
-          return Scaffold(
-            body: SafeArea(
-              bottom: false,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 600),
-                  child: selectedPage,
+      child: BlocListener<RoomCubit, RoomState>(
+        listenWhen: (previous, current) =>
+            !identical(previous.rooms, current.rooms),
+        listener: (_, state) => _ledgerCubit.loadRooms(state.rooms),
+        child: BlocBuilder<ProfileCubit, ProfileState>(
+          builder: (context, state) {
+            final profileName = state.profile?.displayName.trim();
+            final authName = widget.currentUser?.displayName?.trim();
+            final emailName = widget.currentUser?.email
+                ?.trim()
+                .split('@')
+                .first;
+            final displayName = switch (true) {
+              _ when profileName?.isNotEmpty == true => profileName!,
+              _ when authName?.isNotEmpty == true => authName!,
+              _ when emailName?.isNotEmpty == true => emailName!,
+              _ => 'there',
+            };
+            final selectedPage = switch (_selectedTab) {
+              0 => BlocBuilder<RoomCubit, RoomState>(
+                builder: (context, roomState) => _buildRooms(
+                  displayName,
+                  roomState,
+                  context.watch<RoomLedgerCubit>().state,
                 ),
               ),
-            ),
-            bottomNavigationBar: _buildNavigation(),
-          );
-        },
+              1 => HistoryPage(
+                currentUserId: widget.currentUser?.uid ?? '',
+                currentUserDisplayName: displayName,
+                expenseRepository: widget.expenseRepository,
+              ),
+              2 => const StatisticsPage(),
+              _ => ProfilePage(
+                user: widget.currentUser,
+                onSignOut: widget.onSignOut,
+              ),
+            };
+
+            return Scaffold(
+              body: SafeArea(
+                bottom: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: selectedPage,
+                  ),
+                ),
+              ),
+              bottomNavigationBar: _buildNavigation(),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildRooms(String displayName, RoomState roomState) {
+  Widget _buildRooms(
+    String displayName,
+    RoomState roomState,
+    RoomLedgerState ledgerState,
+  ) {
     return CustomScrollView(
       key: const PageStorageKey('rooms-home'),
       slivers: [
@@ -117,7 +146,7 @@ class _RoomsPageState extends State<RoomsPage> {
             children: [
               _buildHeader(displayName),
               const SizedBox(height: 20),
-              _buildObligationCard(),
+              _buildObligationCard(roomState, ledgerState),
               const SizedBox(height: 26),
               SectionHeading(
                 'Your rooms',
@@ -170,21 +199,23 @@ class _RoomsPageState extends State<RoomsPage> {
             ],
           ),
         ),
-        IconButton(
-          tooltip: 'Activity and notifications',
-          onPressed: () => _showMessage('Your activity is all caught up.'),
-          icon: const Icon(Icons.notifications_none_rounded),
-        ),
-        IconButton(
-          tooltip: 'Members',
-          onPressed: () => _showMessage('Choose a room to see its members.'),
-          icon: const Icon(Icons.groups_2_outlined),
-        ),
       ],
     );
   }
 
-  Widget _buildObligationCard() {
+  Widget _buildObligationCard(
+    RoomState roomState,
+    RoomLedgerState ledgerState,
+  ) {
+    final userId = widget.currentUser?.uid ?? '';
+    final balances = ledgerState.netBalanceByCurrency(userId);
+    final currency = balances.keys.isNotEmpty ? balances.keys.first : 'MYR';
+    final balance = balances[currency] ?? 0;
+    final status = balance == 0
+        ? 'In balance'
+        : balance > 0
+        ? 'You are owed'
+        : 'You owe';
     return SurfaceCard(
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
@@ -199,29 +230,32 @@ class _RoomsPageState extends State<RoomsPage> {
           LayoutBuilder(
             builder: (context, constraints) {
               if (constraints.maxWidth < 320) {
-                return const Row(
+                return Row(
                   children: [
-                    StatusPill(label: '3 active rooms'),
-                    Spacer(),
+                    StatusPill(label: '${roomState.rooms.length} active rooms'),
+                    const Spacer(),
                   ],
                 );
               }
               return Row(
                 children: [
                   StatusPill(
-                    label: '3 active trips & groups',
+                    label: '${roomState.rooms.length} active rooms',
                     textColor: Colors.white,
                     color: Colors.black.withValues(alpha: 0.1),
                   ),
                   Spacer(),
-                  Text('Updated just now', style: _captionStyle),
+                  const Text(
+                    'Updated just now',
+                    style: TextStyle(fontSize: 11, color: AppColors.white),
+                  ),
                 ],
               );
             },
           ),
           const SizedBox(height: 19),
           const Text(
-            'Your shared obligation',
+            'Monthly Household',
             style: TextStyle(color: AppColors.white, fontSize: 13),
           ),
           const SizedBox(height: 1),
@@ -230,7 +264,7 @@ class _RoomsPageState extends State<RoomsPage> {
             children: [
               Expanded(
                 child: Text(
-                  'RM 428.10',
+                  formatCurrency(balance.abs(), currency: currency),
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -241,7 +275,7 @@ class _RoomsPageState extends State<RoomsPage> {
                 ),
               ),
               StatusPill(
-                label: 'In balance',
+                label: status,
                 textColor: Colors.white,
                 color: Colors.white.withValues(alpha: 0.2),
               ),
@@ -357,8 +391,6 @@ class _RoomsPageState extends State<RoomsPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
   }
-
-  static const _captionStyle = TextStyle(fontSize: 11, color: AppColors.white);
 }
 
 class _RoomCard extends StatelessWidget {

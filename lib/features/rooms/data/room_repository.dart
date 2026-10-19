@@ -10,6 +10,10 @@ abstract interface class RoomRepository {
 
   Future<RoomInvite> createInvite({required String roomId});
 
+  Future<void> removeMember({required String roomId, required String memberId});
+
+  Future<void> deleteRoom({required String roomId});
+
   Future<RoomJoinResult> joinRoom({required String inviteCode});
 
   Future<RoomCreationResult> createRoom({

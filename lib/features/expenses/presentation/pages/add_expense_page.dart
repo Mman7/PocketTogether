@@ -149,7 +149,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
                             padding: const EdgeInsets.only(right: 8),
                             child: _CategoryChip(
                               name: category,
-                              emoji: categoryEmoji(category),
+                              icon: categoryIcon(category),
                               selected: _category == category,
                               onTap: () => _setCategory(category),
                             ),
@@ -406,7 +406,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
     for (final member in widget.members) {
       if (member.userId == userId) return member.displayName;
     }
-    return userId;
+    if (userId == widget.currentUserId) return widget.currentUserDisplayName;
+    return 'Unknown member';
   }
 
   void _setCategory(String category) {
@@ -619,13 +620,13 @@ class _AmountCard extends StatelessWidget {
 class _CategoryChip extends StatelessWidget {
   const _CategoryChip({
     required this.name,
-    required this.emoji,
+    required this.icon,
     required this.selected,
     required this.onTap,
   });
 
   final String name;
-  final String emoji;
+  final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
@@ -633,7 +634,7 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Text(emoji, style: const TextStyle(fontSize: 17)),
+      icon: Icon(icon, size: 18),
       label: Text(name),
       style: OutlinedButton.styleFrom(
         backgroundColor: selected ? AppColors.paleBlue : AppColors.white,

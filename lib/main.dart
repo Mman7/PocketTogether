@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
 
+// TODO test the feature
 Future<void> testLocalFunction(FirebaseFunctions functions) async {
   try {
     final callable = functions.httpsCallable('helloFromLocal');
@@ -29,7 +30,7 @@ Future<void> main() async {
 
   const useEmulators = bool.fromEnvironment(
     'USE_FIREBASE_EMULATORS',
-    defaultValue: false,
+    defaultValue: true,
   );
 
   final functions = FirebaseFunctions.instanceFor(

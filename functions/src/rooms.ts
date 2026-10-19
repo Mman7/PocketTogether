@@ -14,12 +14,26 @@ const app = getApps().length === 0 ? initializeApp() : getApp();
 const firestore = getFirestore(app);
 const inviteAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const inviteLength = 8;
-const inviteLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+// Invite lifetime in milliseconds (1 days)
+const inviteLifetimeMs = 1 * 24 * 60 * 60 * 1000;
 const maxInviteAttempts = 8;
 
 interface CreateRoomData {
   name?: unknown;
   currency?: unknown;
+}
+
+interface DeleteRoomData {
+  roomId?: unknown;
+}
+
+interface RemoveRoomMemberData {
+  roomId?: unknown;
+  memberId?: unknown;
+}
+
+interface GetRoomMembersData {
+  roomId?: unknown;
 }
 
 interface CreateRoomInviteData {
@@ -117,7 +131,6 @@ export async function createRoomHandler(
     typeof data['currency'] === 'string' && /^[A-Z]{3}$/.test(data['currency'])
       ? data['currency']
       : 'MYR';
-  const { displayName } = await getProfile(uid, db);
   const roomRef = db.collection('rooms').doc();
 
   for (let attempt = 0; attempt < maxInviteAttempts; attempt += 1) {
@@ -140,7 +153,7 @@ export async function createRoomHandler(
           memberIds: [uid],
         });
         transaction.create(roomRef.collection('members').doc(uid), {
-          displayName,
+          userId: uid,
           role: 'owner',
           joinedAt: now,
         });
@@ -220,13 +233,137 @@ export async function createRoomInviteHandler(
   );
 }
 
+export async function deleteRoomHandler(
+  request: CallableRequest<DeleteRoomData>,
+  db: Firestore = firestore,
+): Promise<{ roomId: string }> {
+  const uid = requireUid(request);
+  const data = asRecord(request.data);
+  const roomId = typeof data['roomId'] === 'string' ? data['roomId'].trim() : '';
+  if (roomId.length === 0) {
+    throw new HttpsError('invalid-argument', 'A room is required.');
+  }
+
+  const roomRef = db.collection('rooms').doc(roomId);
+  await db.runTransaction(async (transaction) => {
+    const roomSnapshot = await transaction.get(roomRef);
+    if (!roomSnapshot.exists) {
+      throw new HttpsError('not-found', 'This room is no longer available.');
+    }
+    if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the room owner can delete the room.');
+    }
+    const [memberSnapshot, expenseSnapshot, inviteSnapshot] = await Promise.all([
+      transaction.get(roomRef.collection('members')),
+      transaction.get(roomRef.collection('expenses')),
+      transaction.get(db.collection('roomInvites').where('roomId', '==', roomId)),
+    ]);
+    for (const document of memberSnapshot.docs) transaction.delete(document.ref);
+    for (const document of expenseSnapshot.docs) transaction.delete(document.ref);
+    for (const document of inviteSnapshot.docs) transaction.delete(document.ref);
+    transaction.delete(roomRef);
+  });
+
+  return { roomId };
+}
+
+export async function removeRoomMemberHandler(
+  request: CallableRequest<RemoveRoomMemberData>,
+  db: Firestore = firestore,
+): Promise<{ roomId: string; memberId: string }> {
+  const uid = requireUid(request);
+  const data = asRecord(request.data);
+  const roomId = typeof data['roomId'] === 'string' ? data['roomId'].trim() : '';
+  const memberId = typeof data['memberId'] === 'string' ? data['memberId'].trim() : '';
+  if (roomId.length === 0 || memberId.length === 0) {
+    throw new HttpsError('invalid-argument', 'A room and member are required.');
+  }
+  if (memberId === uid) {
+    throw new HttpsError('failed-precondition', 'The room owner cannot be removed.');
+  }
+
+  const roomRef = db.collection('rooms').doc(roomId);
+  await db.runTransaction(async (transaction) => {
+    const roomSnapshot = await transaction.get(roomRef);
+    if (!roomSnapshot.exists) {
+      throw new HttpsError('not-found', 'This room is no longer available.');
+    }
+    if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the room owner can remove members.');
+    }
+
+    const memberRef = roomRef.collection('members').doc(memberId);
+    const memberSnapshot = await transaction.get(memberRef);
+    if (!memberSnapshot.exists) {
+      throw new HttpsError('not-found', 'That member is no longer in the room.');
+    }
+    transaction.delete(memberRef);
+    transaction.update(roomRef, {
+      memberIds: FieldValue.arrayRemove(memberId),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  return { roomId, memberId };
+}
+
+export async function getRoomMembersHandler(
+  request: CallableRequest<GetRoomMembersData>,
+  db: Firestore = firestore,
+): Promise<Array<Record<string, unknown>>> {
+  const uid = requireUid(request);
+  const data = asRecord(request.data);
+  const roomId = typeof data['roomId'] === 'string' ? data['roomId'].trim() : '';
+  if (roomId.length === 0) {
+    throw new HttpsError('invalid-argument', 'A room is required.');
+  }
+
+  const roomRef = db.collection('rooms').doc(roomId);
+  const roomSnapshot = await roomRef.get();
+  if (!roomSnapshot.exists) {
+    throw new HttpsError('not-found', 'This room is no longer available.');
+  }
+  const memberIds = roomSnapshot.get('memberIds');
+  if (!Array.isArray(memberIds) || !memberIds.includes(uid)) {
+    throw new HttpsError('permission-denied', 'You are not a member of this room.');
+  }
+
+  const memberSnapshot = await roomRef.collection('members').get();
+  const profileSnapshots = await db.getAll(
+    ...memberSnapshot.docs.map((member) => db.collection('users').doc(member.id)),
+  );
+  const profilesById = new Map(
+    profileSnapshots.map((profile) => [profile.id, profile.data() ?? {}]),
+  );
+
+  return Promise.all(
+    memberSnapshot.docs.map(async (member) => {
+      const profile = profilesById.get(member.id) ?? {};
+      const profileName =
+        typeof profile['displayName'] === 'string'
+          ? profile['displayName'].trim()
+          : '';
+      const displayName = profileName || (await getProfile(member.id, db)).displayName;
+      const memberData = member.data();
+      return {
+        userId: member.id,
+        displayName,
+        role: memberData['role'] ?? 'member',
+        joinedAt:
+          memberData['joinedAt'] instanceof Timestamp
+            ? memberData['joinedAt'].toDate().toISOString()
+            : null,
+      };
+    }),
+  );
+}
+
 export async function joinRoomHandler(
   request: CallableRequest<JoinRoomData>,
   db: Firestore = firestore,
 ): Promise<{ roomId: string; status: 'joined' | 'already-member' }> {
   const uid = requireUid(request);
   const code = validateInviteCode(asRecord(request.data)['inviteCode']);
-  const { displayName } = await getProfile(uid, db);
   const inviteRef = db.collection('roomInvites').doc(code);
 
   return db.runTransaction(async (transaction) => {
@@ -265,7 +402,7 @@ export async function joinRoomHandler(
 
     const now = FieldValue.serverTimestamp();
     transaction.create(memberRef, {
-      displayName,
+      userId: uid,
       role: 'member',
       joinedAt: now,
     });

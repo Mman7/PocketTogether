@@ -4,7 +4,10 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import {
   createRoomHandler,
   createRoomInviteHandler,
+  deleteRoomHandler,
+  getRoomMembersHandler,
   joinRoomHandler,
+  removeRoomMemberHandler,
 } from './rooms';
 
 
@@ -16,7 +19,7 @@ export const helloFromLocal = onCall((request) => {
   if (typeof name !== "string" || !name.trim()) {
     throw new HttpsError(
       "invalid-argument",
-      "Please provide a name."
+      "Please provide a name"
     );
   }
 
@@ -34,7 +37,14 @@ export const createRoomInvite = onCall((request) =>
   createRoomInviteHandler(request),
 );
 
+export const deleteRoom = onCall((request) => deleteRoomHandler(request));
 
+export const removeRoomMember = onCall((request) =>
+  removeRoomMemberHandler(request),
+);
 
+export const getRoomMembers = onCall((request) =>
+  getRoomMembersHandler(request),
+);
 
 export const joinRoom = onCall((request) => joinRoomHandler(request));

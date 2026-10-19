@@ -20,8 +20,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  bool _notifications = true;
-
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileCubit>().state.profile;
@@ -99,68 +97,12 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 22),
-              const SectionHeading('Preferences'),
-              const SizedBox(height: 8),
-              SurfaceCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    SwitchListTile.adaptive(
-                      value: _notifications,
-                      onChanged: (value) =>
-                          setState(() => _notifications = value),
-                      title: const Text(
-                        'Notifications',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Room updates and settlement reminders',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                      activeThumbColor: AppColors.primary,
-                    ),
-                    const Divider(height: 1, indent: 16, endIndent: 16),
-                    _SettingsRow(
-                      icon: Icons.currency_exchange_rounded,
-                      title: 'Default currency',
-                      value: 'MYR',
-                      onTap: () => _chooseCurrency(context),
-                    ),
-                    const Divider(height: 1, indent: 58, endIndent: 16),
-                    _SettingsRow(
-                      icon: Icons.palette_outlined,
-                      title: 'Theme',
-                      value: 'System',
-                      onTap: () => _chooseTheme(context),
-                    ),
-                    const Divider(height: 1, indent: 58, endIndent: 16),
-                    _SettingsRow(
-                      icon: Icons.lock_outline_rounded,
-                      title: 'Account settings',
-                      onTap: () => _message(
-                        context,
-                        'Your account settings are up to date.',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
               const SectionHeading('Help & account'),
               const SizedBox(height: 8),
               SurfaceCard(
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    _SettingsRow(
-                      icon: Icons.help_outline_rounded,
-                      title: 'Help center',
-                      onTap: () => _message(context, 'Help center opened.'),
-                    ),
-                    const Divider(height: 1, indent: 58, endIndent: 16),
                     _SettingsRow(
                       icon: Icons.logout_rounded,
                       title: 'Sign out',
@@ -203,61 +145,6 @@ class _ProfilePageState extends State<ProfilePage> {
     if (updated == true && context.mounted) {
       _message(context, 'Display name updated.');
     }
-  }
-
-  void _chooseCurrency(BuildContext context) {
-    _showChoices(context, 'Default currency', [
-      'MYR · Malaysian Ringgit',
-      'JPY · Japanese Yen',
-      'THB · Thai Baht',
-    ]);
-  }
-
-  void _chooseTheme(BuildContext context) {
-    _showChoices(context, 'Appearance', ['System', 'Light']);
-  }
-
-  void _showChoices(BuildContext context, String title, List<String> choices) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              for (final choice in choices)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(choice),
-                  trailing: choice.startsWith('MYR') || choice == 'System'
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: AppColors.primary,
-                        )
-                      : null,
-                  onTap: () {
-                    Navigator.pop(context);
-                    _message(
-                      this.context,
-                      '$choice selected for this preview.',
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -321,14 +208,12 @@ class _SettingsRow extends StatelessWidget {
   const _SettingsRow({
     required this.icon,
     required this.title,
-    this.value,
     this.destructive = false,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String? value;
   final bool destructive;
   final VoidCallback onTap;
 
@@ -350,26 +235,10 @@ class _SettingsRow extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-      trailing: value == null
-          ? Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.muted.withValues(alpha: 0.7),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value!,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                ),
-                const SizedBox(width: 3),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.muted,
-                  size: 18,
-                ),
-              ],
-            ),
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: AppColors.muted.withValues(alpha: 0.7),
+      ),
     );
   }
 }

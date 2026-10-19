@@ -203,6 +203,21 @@ class FakeRoomRepository implements RoomRepository {
   }
 
   @override
+  Future<void> removeMember({
+    required String roomId,
+    required String memberId,
+  }) async {
+    roomMembers[roomId]?.removeWhere((member) => member.userId == memberId);
+  }
+
+  @override
+  Future<void> deleteRoom({required String roomId}) async {
+    rooms.removeWhere((room) => room.id == roomId);
+    roomMembers.remove(roomId);
+    _roomsController.add(List.of(rooms));
+  }
+
+  @override
   Future<RoomJoinResult> joinRoom({required String inviteCode}) async {
     if (failure != null) throw failure!;
     if (inviteCode == 'BAD123' || inviteCode == 'EXPIRED') {

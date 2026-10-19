@@ -211,7 +211,11 @@ class _CategoryTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Text(category.emoji, style: const TextStyle(fontSize: 22)),
+              Icon(
+                category.icon,
+                size: 22,
+                color: selected ? AppColors.white : AppColors.primary,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(

@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../core/presentation/mock_data.dart';
 import '../../../../shared/presentation/category_emoji.dart';
+import '../../../../shared/presentation/money_format.dart';
 import '../../../../shared/presentation/short_date.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../expenses/data/expense_repository.dart';
@@ -16,6 +16,7 @@ import '../../../expenses/presentation/pages/expense_detail_page.dart';
 import '../../data/room_repository.dart';
 import '../../models/room.dart';
 import '../../models/room_member.dart';
+import 'room_section_pages.dart';
 
 class RoomDashboardPage extends StatefulWidget {
   const RoomDashboardPage({
@@ -41,6 +42,8 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
   late final ExpenseCubit _expenseCubit;
   late Future<List<RoomMember>> _membersFuture;
   bool _creatingInvite = false;
+  bool _removingMember = false;
+  bool _deletingRoom = false;
 
   @override
   void initState() {
@@ -114,18 +117,20 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
         ),
         actions: [
           if (widget.room.ownerId == widget.currentUserId)
-            TextButton.icon(
-              onPressed: _creatingInvite ? null : _showInviteCode,
-              icon: _creatingInvite
-                  ? const SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.mail_outline_rounded),
-              label: const Text('Invite'),
+            Builder(
+              builder: (scaffoldContext) => IconButton(
+                onPressed: _deletingRoom
+                    ? null
+                    : () => Scaffold.of(scaffoldContext).openEndDrawer(),
+                icon: const Icon(Icons.more_vert_rounded),
+                tooltip: 'Room actions',
+              ),
             ),
         ],
       ),
+      endDrawer: widget.room.ownerId == widget.currentUserId
+          ? _buildRoomDrawer(members)
+          : null,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 90),
         children: [
@@ -151,7 +156,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _money(total / 100),
+                  formatCurrency(total, currency: widget.room.currency),
                   style: const TextStyle(
                     fontSize: 33,
                     fontWeight: FontWeight.w800,
@@ -169,12 +174,12 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                     children: [
                       _Metric(
                         label: 'Today',
-                        value: _money(
+                        value: formatCurrency(
                           today.fold<int>(
-                                0,
-                                (sum, expense) => sum + expense.amountInCents,
-                              ) /
-                              100,
+                            0,
+                            (sum, expense) => sum + expense.amountInCents,
+                          ),
+                          currency: widget.room.currency,
                         ),
                       ),
                       _Metric(label: 'Members', value: '${members.length}'),
@@ -264,11 +269,16 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
           else if (state.expenses.isEmpty && state.errorMessage == null)
             const _RoomEmptyState()
           else
-            for (final expense in today.take(4)) ...[
+            for (final expense in today.take(5)) ...[
               _FirestoreExpenseTile(
                 expense: expense,
-                amount: _money(expense.amountInCents / 100),
+                amount: formatCurrency(
+                  expense.amountInCents,
+                  currency: widget.room.currency,
+                ),
                 paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
+                createdByCurrentUser:
+                    expense.createdByUserId == widget.currentUserId,
                 onTap: () => _openExpense(expense, members),
               ),
               const SizedBox(height: 8),
@@ -307,15 +317,206 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
 
   String get _periodLabel => 'All time';
 
-  String _money(double amount) {
-    switch (widget.room.currency) {
-      case 'JPY':
-        return '¥${amount.toStringAsFixed(0)}';
-      case 'THB':
-        return '฿${amount.toStringAsFixed(0)}';
-      default:
-        return formatMoney(amount);
-    }
+  Widget _buildRoomDrawer(List<RoomMember> members) {
+    return Drawer(
+      backgroundColor: AppColors.canvas,
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 18, 12, 20),
+              decoration: const BoxDecoration(
+                color: AppColors.paleBlue,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(AppRadii.card),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Room actions',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.home_work_outlined,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          widget.room.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Owner controls',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
+              child: Text(
+                'PEOPLE',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            _roomActionTile(
+              icon: Icons.mail_outline_rounded,
+              title: 'Generate invite',
+              subtitle: 'Invite someone to this room',
+              iconColor: AppColors.primary,
+              enabled: !_creatingInvite,
+              onTap: () async {
+                Navigator.of(context).pop();
+                await _showInviteCode();
+              },
+            ),
+            _roomActionTile(
+              icon: Icons.person_remove_outlined,
+              title: 'Remove member',
+              subtitle: 'Remove a member from this room',
+              iconColor: AppColors.secondary,
+              enabled: !_removingMember,
+              onTap: () async {
+                Navigator.of(context).pop();
+                await _showRemoveMemberDialog(members);
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
+              child: Text(
+                'DANGER ZONE',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            _roomActionTile(
+              icon: Icons.delete_outline_rounded,
+              title: 'Delete room',
+              subtitle: 'Permanently delete this room',
+              iconColor: AppColors.danger,
+              titleColor: AppColors.danger,
+              enabled: !_deletingRoom,
+              onTap: () async {
+                Navigator.of(context).pop();
+                await _confirmDeleteRoom();
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roomActionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color iconColor,
+    required VoidCallback onTap,
+    required bool enabled,
+    Color? titleColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Material(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: titleColor ?? AppColors.ink,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.muted,
+                  size: 20,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _membersCard(
@@ -333,11 +534,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
           children: [
             const Text('Unable to load room members.'),
             TextButton(
-              onPressed: () => setState(
-                () => _membersFuture = widget.roomRepository.getRoomMembers(
-                  widget.room.id,
-                ),
-              ),
+              onPressed: () {
+                setState(() {
+                  _membersFuture = widget.roomRepository.getRoomMembers(
+                    widget.room.id,
+                  );
+                });
+              },
               child: const Text('Retry'),
             ),
           ],
@@ -405,11 +608,20 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     );
   }
 
-  void _openMembers(List<RoomMember> members) {
+  Future<void> _openMembers(List<RoomMember> members) async {
+    List<RoomMember> latestMembers;
+    try {
+      latestMembers = await widget.roomRepository.getRoomMembers(
+        widget.room.id,
+      );
+    } on RoomFailure {
+      latestMembers = members;
+    }
+    if (!mounted) return;
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) =>
-            _RoomMembersPage(roomName: widget.room.name, members: members),
+            RoomMembersPage(roomName: widget.room.name, members: latestMembers),
       ),
     );
   }
@@ -484,6 +696,125 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     }
   }
 
+  Future<void> _showRemoveMemberDialog(List<RoomMember> members) async {
+    final removableMembers = members
+        .where((member) => !member.isOwner)
+        .toList();
+    if (removableMembers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('There are no other members to remove.')),
+      );
+      return;
+    }
+    final member = await showDialog<RoomMember>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove member'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: removableMembers.length,
+            itemBuilder: (_, index) {
+              final candidate = removableMembers[index];
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_outline_rounded),
+                title: Text(candidate.displayName),
+                onTap: () => Navigator.of(dialogContext).pop(candidate),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (member == null || !mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove this member?'),
+        content: Text('${member.displayName} will lose access to this room.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _removeMember(member);
+  }
+
+  Future<void> _removeMember(RoomMember member) async {
+    setState(() => _removingMember = true);
+    try {
+      await widget.roomRepository.removeMember(
+        roomId: widget.room.id,
+        memberId: member.userId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _membersFuture = widget.roomRepository.getRoomMembers(widget.room.id);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${member.displayName} was removed.')),
+      );
+    } on RoomFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _removingMember = false);
+    }
+  }
+
+  Future<void> _confirmDeleteRoom() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete room?'),
+        content: Text(
+          'This will permanently delete ${widget.room.name}, its expenses, and its members.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete room'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deletingRoom = true);
+    try {
+      await widget.roomRepository.deleteRoom(roomId: widget.room.id);
+      if (mounted) Navigator.of(context).pop();
+    } on RoomFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _deletingRoom = false);
+    }
+  }
+
   String _formatInviteExpiry(DateTime value) {
     final local = value.toLocal();
     final day = local.day.toString().padLeft(2, '0');
@@ -514,102 +845,17 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
       );
       return;
     }
-    if (section == 'Stats') {
-      Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          builder: (_) => BlocProvider.value(
-            value: _expenseCubit,
-            child: _RoomStatisticsPage(
-              room: widget.room,
-              membersFuture: _membersFuture,
-            ),
-          ),
-        ),
-      );
-      return;
-    }
-    final total = _expenseCubit.state.expenses.fold<int>(
-      0,
-      (sum, expense) => sum + expense.amountInCents,
-    );
-    final mockRoom = RoomMock(
-      name: widget.room.name,
-      subtitle: widget.room.description ?? 'Shared room',
-      emoji: '🏠',
-      currency: widget.room.currency ?? 'MYR',
-      total: _money(total / 100),
-      members: members
-          .map((member) => member.displayName.split(' ').first)
-          .toList(),
-    );
+    final page = section == 'Stats'
+        ? RoomStatisticsPage(room: widget.room, members: members)
+        : RoomSettlePage(
+            room: widget.room,
+            members: members,
+            currentUserId: widget.currentUserId,
+          );
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => RoomSectionPage(room: mockRoom, section: section),
+        builder: (_) => BlocProvider.value(value: _expenseCubit, child: page),
       ),
-    );
-  }
-}
-
-class _RoomMembersPage extends StatelessWidget {
-  const _RoomMembersPage({required this.roomName, required this.members});
-
-  final String roomName;
-  final List<RoomMember> members;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('$roomName members')),
-      body: members.isEmpty
-          ? const Center(child: Text('No members found in this room.'))
-          : ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                for (final member in members) ...[
-                  SurfaceCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        MemberAvatar(
-                          name: member.displayName,
-                          size: 42,
-                          color: member.isOwner
-                              ? AppColors.paleBlue
-                              : AppColors.paleCyan,
-                        ),
-                        const SizedBox(width: 11),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                member.displayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              if (member.email != null)
-                                Text(
-                                  member.email!,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.muted,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        StatusPill(label: member.isOwner ? 'Owner' : 'Member'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 9),
-                ],
-              ],
-            ),
     );
   }
 }
@@ -665,11 +911,12 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
               final expense = state.expenses[index];
               return _FirestoreExpenseTile(
                 expense: expense,
-                amount: _formatExpenseMoney(
-                  room.currency,
+                amount: formatCurrency(
                   expense.amountInCents,
+                  currency: room.currency,
                 ),
                 paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
+                createdByCurrentUser: expense.createdByUserId == currentUserId,
                 onTap: () => Navigator.of(context).push<void>(
                   MaterialPageRoute<void>(
                     builder: (_) => BlocProvider.value(
@@ -691,603 +938,6 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _RoomStatisticsPage extends StatelessWidget {
-  const _RoomStatisticsPage({required this.room, required this.membersFuture});
-
-  final Room room;
-  final Future<List<RoomMember>> membersFuture;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('${room.name} stats')),
-      body: BlocBuilder<ExpenseCubit, ExpenseState>(
-        builder: (context, state) {
-          if (state.isLoading && state.expenses.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (state.errorMessage != null && state.expenses.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(state.errorMessage!),
-                  TextButton(
-                    onPressed: () =>
-                        context.read<ExpenseCubit>().loadExpenses(room.id),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final now = DateTime.now();
-          final monthExpenses = state.expenses
-              .where(
-                (expense) =>
-                    expense.expenseDate.year == now.year &&
-                    expense.expenseDate.month == now.month,
-              )
-              .toList();
-          final totalInCents = monthExpenses.fold<int>(
-            0,
-            (sum, expense) => sum + expense.amountInCents,
-          );
-          final totalsByCategory = <String, int>{};
-          for (final expense in monthExpenses) {
-            totalsByCategory.update(
-              expense.category,
-              (total) => total + expense.amountInCents,
-              ifAbsent: () => expense.amountInCents,
-            );
-          }
-          final categories = totalsByCategory.entries.toList()
-            ..sort((a, b) => b.value.compareTo(a.value));
-
-          return FutureBuilder<List<RoomMember>>(
-            future: membersFuture,
-            builder: (context, memberSnapshot) {
-              final members = memberSnapshot.data ?? const <RoomMember>[];
-              final memberTotals = <String, int>{
-                for (final member in members) member.userId: 0,
-              };
-              for (final expense in monthExpenses) {
-                memberTotals.update(
-                  expense.paidByUserId,
-                  (total) => total + expense.amountInCents,
-                  ifAbsent: () => expense.amountInCents,
-                );
-              }
-              final memberNames = {
-                for (final member in members) member.userId: member.displayName,
-              };
-              final sortedMemberTotals = memberTotals.entries.toList()
-                ..sort((a, b) => b.value.compareTo(a.value));
-              const categoryColors = [
-                AppColors.primary,
-                AppColors.secondary,
-                AppColors.cyan,
-                AppColors.success,
-                AppColors.danger,
-              ];
-
-              return ListView(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-                children: [
-                  SurfaceCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Total spending in ${_monthName(now.month)}',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 12,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _formatExpenseMoney(room.currency, totalInCents),
-                          style: const TextStyle(
-                            fontSize: 31,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${monthExpenses.length} ${monthExpenses.length == 1 ? 'expense' : 'expenses'}',
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const SectionHeading('Spending by category'),
-                  const SizedBox(height: 10),
-                  if (categories.isEmpty)
-                    const SurfaceCard(child: Text('No expenses this month.'))
-                  else
-                    SurfaceCard(
-                      child: Column(
-                        children: [
-                          for (
-                            var index = 0;
-                            index < categories.length;
-                            index++
-                          ) ...[
-                            if (index > 0) const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.paleBlue,
-                                    borderRadius: BorderRadius.circular(9),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    categoryEmoji(categories[index].key),
-                                    style: const TextStyle(fontSize: 17),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    categories[index].key,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${(categories[index].value * 100 / totalInCents).round()}%',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  _formatExpenseMoney(
-                                    room.currency,
-                                    categories[index].value,
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(5),
-                              child: LinearProgressIndicator(
-                                value: categories[index].value / totalInCents,
-                                color:
-                                    categoryColors[index %
-                                        categoryColors.length],
-                                backgroundColor: AppColors.paleBlue,
-                                minHeight: 7,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  const SectionHeading('Paid by member'),
-                  const SizedBox(height: 10),
-                  if (memberSnapshot.connectionState == ConnectionState.waiting)
-                    const SurfaceCard(
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else if (memberSnapshot.hasError)
-                    const SurfaceCard(
-                      child: Text('Unable to load room members.'),
-                    )
-                  else if (sortedMemberTotals.isEmpty)
-                    const SurfaceCard(child: Text('No members found.'))
-                  else
-                    SurfaceCard(
-                      child: Column(
-                        children: [
-                          for (final entry in sortedMemberTotals) ...[
-                            Row(
-                              children: [
-                                MemberAvatar(
-                                  name: memberNames[entry.key] ?? 'Unknown',
-                                  size: 30,
-                                  color: AppColors.paleBlue,
-                                  border: false,
-                                ),
-                                const SizedBox(width: 9),
-                                Expanded(
-                                  child: Text(
-                                    memberNames[entry.key] ?? 'Unknown member',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                Text(
-                                  _formatExpenseMoney(
-                                    room.currency,
-                                    entry.value,
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (entry.key != sortedMemberTotals.last.key)
-                              const SizedBox(height: 12),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-String _monthName(int month) => const [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-][month - 1];
-
-String _formatExpenseMoney(String? currency, int amountInCents) {
-  final amount = amountInCents / 100;
-  switch (currency) {
-    case 'JPY':
-      return '¥${amount.toStringAsFixed(0)}';
-    case 'THB':
-      return '฿${amount.toStringAsFixed(0)}';
-    default:
-      return formatMoney(amount);
-  }
-}
-
-class RoomSectionPage extends StatefulWidget {
-  const RoomSectionPage({required this.room, required this.section, super.key});
-
-  final RoomMock room;
-  final String section;
-
-  @override
-  State<RoomSectionPage> createState() => _RoomSectionPageState();
-}
-
-class _RoomSectionPageState extends State<RoomSectionPage> {
-  final Set<String> _paidSettlements = {};
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.section,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-        children: switch (widget.section) {
-          // member page
-          'Members' => _members(),
-          // settle page
-          'Settle' => _settlements(),
-          _ => _history(),
-        },
-      ),
-    );
-  }
-
-  List<Widget> _members() => [
-    SurfaceCard(
-      color: AppColors.paleBlue,
-      child: Row(
-        children: [
-          const Icon(Icons.groups_rounded, color: AppColors.primary),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              '${widget.room.members.length} people are sharing ${widget.room.name}.',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 16),
-    for (final member in roomMembers) ...[
-      SurfaceCard(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-        child: Row(
-          children: [
-            MemberAvatar(name: member.name, size: 42, color: member.color),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.name,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    member.role,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  'Total spending',
-                  style: TextStyle(fontSize: 10, color: AppColors.muted),
-                ),
-                Text(
-                  _money(member.spending),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Member options',
-              onSelected: (value) => _memberAction(member, value),
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'invite',
-                  child: Text('Manage invite'),
-                ),
-                if (member.role == 'Member')
-                  const PopupMenuItem(
-                    value: 'remove',
-                    child: Text('Remove member'),
-                  ),
-                if (member.role == 'Owner')
-                  const PopupMenuItem(
-                    value: 'regenerate',
-                    child: Text('Regenerate invite'),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 9),
-    ],
-    const SizedBox(height: 6),
-    OutlinedButton.icon(
-      onPressed: () => _message('Invite code copied: JAPAN-4K8D'),
-      icon: const Icon(Icons.link_rounded),
-      label: const Text('Manage room invite'),
-    ),
-  ];
-
-  List<Widget> _settlements() => [
-    SurfaceCard(
-      color: AppColors.paleBlue,
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Everyone is almost even',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-          ),
-          SizedBox(height: 4),
-          Text(
-            'Suggested transfers keep the number of payments low.',
-            style: TextStyle(color: AppColors.muted, fontSize: 12),
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 17),
-    const SectionHeading(
-      'Suggested settlements',
-      trailing: StatusPill(label: '2 pending', color: AppColors.accent),
-    ),
-    const SizedBox(height: 10),
-    for (final pair in const [
-      ('Eric', 'John', 50.0),
-      ('David', 'John', 30.0),
-      ('Amy', 'Eric', 20.0),
-    ]) ...[
-      SurfaceCard(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            _SettlementAvatars(from: pair.$1, to: pair.$2),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${pair.$1} → ${pair.$2}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  Text(
-                    _paidSettlements.contains(pair.$1)
-                        ? 'Paid just now'
-                        : 'Pending',
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  _money(pair.$3),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _paidSettlements.contains(pair.$1)
-                      ? null
-                      : () => _markPaid(pair.$1),
-                  child: Text(
-                    _paidSettlements.contains(pair.$1) ? 'Paid' : 'Mark paid',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 9),
-    ],
-  ];
-
-  List<Widget> _history() {
-    final expenses = widget.room.currency == 'MYR'
-        ? householdExpenses
-        : japanExpenses;
-    return [
-      SurfaceCard(
-        child: Row(
-          children: [
-            const Icon(Icons.filter_list_rounded, color: AppColors.primary),
-            const SizedBox(width: 9),
-            const Expanded(
-              child: Text(
-                'October · All categories',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-            Text(
-              '${expenses.length} items',
-              style: const TextStyle(color: AppColors.muted, fontSize: 11),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 16),
-      for (final group in ['Today', 'Yesterday', 'Earlier']) ...[
-        if (expenses.any((expense) => expense.dateGroup == group)) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 9, top: 5),
-            child: Text(
-              group,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-          for (final expense in expenses.where(
-            (expense) => expense.dateGroup == group,
-          )) ...[
-            _ExpenseTile(
-              expense: expense,
-              amount: _money(expense.amount),
-              onTap: () => _message('Open room history to manage expenses.'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ],
-      ],
-    ];
-  }
-
-  void _markPaid(String name) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Mark this payment as paid?'),
-        content: Text('This will update the preview status for $name.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Not yet'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Mark paid'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) setState(() => _paidSettlements.add(name));
-  }
-
-  void _memberAction(MemberMock member, String action) async {
-    if (action == 'invite' || action == 'regenerate') {
-      _message(
-        action == 'invite'
-            ? 'Room invite: JAPAN-4K8D'
-            : 'A fresh invite code is ready: FMLY-82QK',
-      );
-      return;
-    }
-    final remove = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Remove ${member.name.split(' ').first}?'),
-        content: const Text(
-          'They will no longer appear in this local room preview.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
-    );
-    if (remove == true) {
-      _message('${member.name.split(' ').first} removed from the preview.');
-    }
-  }
-
-  String _money(double amount) => widget.room.currency == 'JPY'
-      ? '¥${amount.toStringAsFixed(0)}'
-      : widget.room.currency == 'THB'
-      ? '฿${amount.toStringAsFixed(0)}'
-      : formatMoney(amount);
-
-  void _message(String value) =>
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(value)));
 }
 
 class _QuickAction {
@@ -1325,96 +975,28 @@ class _Metric extends StatelessWidget {
   }
 }
 
-class _ExpenseTile extends StatelessWidget {
-  const _ExpenseTile({
-    required this.expense,
-    required this.amount,
-    required this.onTap,
-  });
-
-  final ExpenseMock expense;
-  final String amount;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.paleBlue,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(expense.emoji, style: const TextStyle(fontSize: 20)),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  expense.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  'Paid by ${expense.paidBy} · ${expense.time}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                amount,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-              ),
-              const Text(
-                'Split equally',
-                style: TextStyle(fontSize: 9, color: AppColors.muted),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _FirestoreExpenseTile extends StatelessWidget {
   const _FirestoreExpenseTile({
     required this.expense,
     required this.amount,
     required this.paidByName,
+    required this.createdByCurrentUser,
     required this.onTap,
   });
 
   final Expense expense;
   final String amount;
   final String paidByName;
+  final bool createdByCurrentUser;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final description = expense.note?.trim();
+    final createdTime = formatShortTime(expense.createdAt);
     return SurfaceCard(
       onTap: onTap,
+      color: createdByCurrentUser ? AppColors.expenseMine : AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       child: Row(
         children: [
@@ -1422,13 +1004,16 @@ class _FirestoreExpenseTile extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: AppColors.paleBlue,
+              color: AppColors.white,
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
-            child: Text(
-              categoryEmoji(expense.category),
-              style: const TextStyle(fontSize: 20),
+            child: Icon(
+              categoryIcon(expense.category),
+              size: 20,
+              color: createdByCurrentUser
+                  ? Colors.deepPurpleAccent
+                  : AppColors.primary,
             ),
           ),
           const SizedBox(width: 11),
@@ -1436,19 +1021,50 @@ class _FirestoreExpenseTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  description == null || description.isEmpty
-                      ? expense.category
-                      : description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        description == null || description.isEmpty
+                            ? expense.category
+                            : description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (createdByCurrentUser)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: AppColors.expenseMineBadge,
+                            borderRadius: BorderRadius.circular(AppRadii.pill),
+                          ),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            child: Text(
+                              'You',
+                              style: TextStyle(
+                                color: Colors.deepPurpleAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 Text(
-                  'Paid by $paidByName · ${formatShortDate(expense.expenseDate)}',
+                  'Paid by $paidByName· ${formatShortDate(expense.expenseDate)}'
+                  '${createdTime == null ? '' : ' · $createdTime'}',
                   style: const TextStyle(fontSize: 10, color: AppColors.muted),
                 ),
               ],
@@ -1487,30 +1103,6 @@ class _RoomEmptyState extends StatelessWidget {
             'Add the first shared expense to get started.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: AppColors.muted),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SettlementAvatars extends StatelessWidget {
-  const _SettlementAvatars({required this.from, required this.to});
-
-  final String from;
-  final String to;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 60,
-      height: 36,
-      child: Stack(
-        children: [
-          MemberAvatar(name: from, size: 34, color: AppColors.paleBlue),
-          Positioned(
-            left: 25,
-            child: MemberAvatar(name: to, size: 34, color: AppColors.paleCyan),
           ),
         ],
       ),

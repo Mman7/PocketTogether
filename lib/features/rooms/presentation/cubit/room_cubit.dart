@@ -80,12 +80,10 @@ class RoomCubit extends Cubit<RoomState> {
       ),
     );
     try {
-      print('launch createRoom');
       final result = await _repository.createRoom(
         name: name,
         currency: currency,
       );
-      print('createdRoom result: $result');
       if (isClosed) return;
       final rooms = [
         ...state.rooms.where((savedRoom) => savedRoom.id != result.room.id),

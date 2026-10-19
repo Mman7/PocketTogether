@@ -25,7 +25,6 @@ class FirebaseRoomRepository implements RoomRepository {
         .where('memberIds', arrayContains: userId)
         .snapshots()
         .map((snapshot) {
-          print(snapshot);
           final rooms = snapshot.docs
               .map((document) => Room.fromMap(document.id, document.data()))
               .toList();
@@ -57,9 +56,17 @@ class FirebaseRoomRepository implements RoomRepository {
   @override
   Future<List<RoomMember>> getRoomMembers(String roomId) async {
     try {
-      final snapshot = await _rooms.doc(roomId).collection('members').get();
-      final members = snapshot.docs
-          .map((document) => RoomMember.fromMap(document.id, document.data()))
+      final result = await _functions
+          .httpsCallable('getRoomMembers')
+          .call<List<dynamic>>({'roomId': roomId});
+      final members = result.data
+          .whereType<Map>()
+          .map(
+            (data) => RoomMember.fromMap(
+              data['userId'] as String,
+              Map<String, dynamic>.from(data),
+            ),
+          )
           .toList();
       members.sort((first, second) {
         if (first.isOwner == second.isOwner) {
@@ -68,6 +75,8 @@ class FirebaseRoomRepository implements RoomRepository {
         return first.isOwner ? -1 : 1;
       });
       return members;
+    } on FirebaseFunctionsException catch (error) {
+      throw _roomFailureFromFunction(error);
     } on FirebaseException {
       throw const RoomFailure('Unable to load room members. Please try again.');
     }
@@ -100,6 +109,38 @@ class FirebaseRoomRepository implements RoomRepository {
       throw const RoomFailure('Unable to create an invite. Please try again.');
     } on FormatException {
       throw const RoomFailure('The server returned an invalid invite.');
+    }
+  }
+
+  @override
+  Future<void> removeMember({
+    required String roomId,
+    required String memberId,
+  }) async {
+    try {
+      await _functions.httpsCallable('removeRoomMember').call<void>({
+        'roomId': roomId,
+        'memberId': memberId,
+      });
+    } on FirebaseFunctionsException catch (error) {
+      throw _roomFailureFromFunction(error);
+    } on FirebaseException {
+      throw const RoomFailure(
+        'Unable to remove that member. Please try again.',
+      );
+    }
+  }
+
+  @override
+  Future<void> deleteRoom({required String roomId}) async {
+    try {
+      await _functions.httpsCallable('deleteRoom').call<void>({
+        'roomId': roomId,
+      });
+    } on FirebaseFunctionsException catch (error) {
+      throw _roomFailureFromFunction(error);
+    } on FirebaseException {
+      throw const RoomFailure('Unable to delete the room. Please try again.');
     }
   }
 

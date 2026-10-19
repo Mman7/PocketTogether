@@ -13,7 +13,7 @@ class ExpenseCubit extends Cubit<ExpenseState> {
     emit(ExpenseState(expenses: state.expenses, isLoading: true));
     try {
       final expenses = await _repository.getExpenses(roomId);
-      emit(ExpenseState(expenses: expenses));
+      emit(ExpenseState(expenses: _sorted(expenses)));
     } on ExpenseFailure catch (error) {
       emit(ExpenseState(expenses: state.expenses, errorMessage: error.message));
     } catch (_) {
@@ -114,9 +114,16 @@ class ExpenseCubit extends Cubit<ExpenseState> {
   }
 
   List<Expense> _sorted(List<Expense> expenses) {
-    expenses.sort(
-      (first, second) => second.expenseDate.compareTo(first.expenseDate),
-    );
+    expenses.sort((first, second) {
+      final firstCreatedAt = first.createdAt;
+      final secondCreatedAt = second.createdAt;
+      if (firstCreatedAt != null && secondCreatedAt != null) {
+        return secondCreatedAt.compareTo(firstCreatedAt);
+      }
+      if (firstCreatedAt != null) return -1;
+      if (secondCreatedAt != null) return 1;
+      return second.expenseDate.compareTo(first.expenseDate);
+    });
     return expenses;
   }
 }
