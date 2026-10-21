@@ -354,6 +354,7 @@ class _RoomsPageState extends State<RoomsPage> {
               : widget.currentUser?.email?.trim().split('@').first ?? 'Member',
           roomRepository: widget.roomRepository,
           expenseRepository: widget.expenseRepository,
+          onDeleted: () => _roomCubit.removeRoom(room.id),
         ),
       ),
     );
@@ -496,6 +497,7 @@ class _RoomPreviewPage extends StatelessWidget {
     required this.displayName,
     required this.roomRepository,
     required this.expenseRepository,
+    required this.onDeleted,
   });
 
   final Room room;
@@ -503,6 +505,7 @@ class _RoomPreviewPage extends StatelessWidget {
   final String displayName;
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
+  final VoidCallback onDeleted;
 
   @override
   Widget build(BuildContext context) {
@@ -512,6 +515,7 @@ class _RoomPreviewPage extends StatelessWidget {
       currentUserDisplayName: displayName,
       roomRepository: roomRepository,
       expenseRepository: expenseRepository,
+      onDeleted: onDeleted,
     );
   }
 }

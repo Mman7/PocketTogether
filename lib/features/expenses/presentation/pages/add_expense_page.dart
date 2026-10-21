@@ -55,7 +55,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
     _paidByUserId = widget.expense?.paidByUserId ?? widget.currentUserId;
     _splitMemberIds =
         widget.expense?.splitAmountsInCents.keys.toSet() ??
-        widget.members.map((member) => member.userId).toSet();
+        {widget.currentUserId};
     _transferMethod = widget.expense?.transferMethod ?? 'Bank transfer';
     final recipients = _transferRecipients(_paidByUserId);
     _transferToUserId =
@@ -305,7 +305,11 @@ class _AddExpensePageState extends State<AddExpensePage> {
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 13,
                               ),
-                              title: Text(member.displayName),
+                              title: Text(
+                                member.userId == widget.currentUserId
+                                    ? '${member.displayName} (You)'
+                                    : member.displayName,
+                              ),
                               value: _selectedSplitIds.contains(member.userId),
                               onChanged: (selected) => setState(() {
                                 if (selected == true) {

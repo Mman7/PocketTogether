@@ -3,6 +3,8 @@ import '../models/expense.dart';
 abstract interface class ExpenseRepository {
   Future<List<Expense>> getExpenses(String roomId);
 
+  Stream<List<Expense>> watchExpenses(String roomId);
+
   Future<Expense> createExpense({
     required String roomId,
     required Expense expense,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/expense_repository.dart';
@@ -8,21 +10,45 @@ class ExpenseCubit extends Cubit<ExpenseState> {
   ExpenseCubit(this._repository) : super(const ExpenseState());
 
   final ExpenseRepository _repository;
+  StreamSubscription<List<Expense>>? _expensesSubscription;
+  String? _watchedRoomId;
 
   Future<void> loadExpenses(String roomId) async {
+    if (_watchedRoomId == roomId && _expensesSubscription != null) return;
+    await _expensesSubscription?.cancel();
+    _watchedRoomId = roomId;
     emit(ExpenseState(expenses: state.expenses, isLoading: true));
     try {
-      final expenses = await _repository.getExpenses(roomId);
-      emit(ExpenseState(expenses: _sorted(expenses)));
-    } on ExpenseFailure catch (error) {
-      emit(ExpenseState(expenses: state.expenses, errorMessage: error.message));
+      _expensesSubscription = _repository
+          .watchExpenses(roomId)
+          .listen(
+            (expenses) {
+              if (!isClosed) {
+                emit(ExpenseState(expenses: _sorted(expenses)));
+              }
+            },
+            onError: (Object error) {
+              if (!isClosed) {
+                emit(
+                  ExpenseState(
+                    expenses: state.expenses,
+                    errorMessage: error is ExpenseFailure
+                        ? error.message
+                        : 'Unable to load expenses.',
+                  ),
+                );
+              }
+            },
+          );
     } catch (_) {
-      emit(
-        ExpenseState(
-          expenses: state.expenses,
-          errorMessage: 'Unable to load expenses.',
-        ),
-      );
+      if (!isClosed) {
+        emit(
+          ExpenseState(
+            expenses: state.expenses,
+            errorMessage: 'Unable to load expenses.',
+          ),
+        );
+      }
     }
   }
 
@@ -125,5 +151,11 @@ class ExpenseCubit extends Cubit<ExpenseState> {
       return second.expenseDate.compareTo(first.expenseDate);
     });
     return expenses;
+  }
+
+  @override
+  Future<void> close() async {
+    await _expensesSubscription?.cancel();
+    await super.close();
   }
 }

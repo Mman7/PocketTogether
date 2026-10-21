@@ -23,7 +23,8 @@ class FirebaseRoomRepository implements RoomRepository {
   Stream<List<Room>> watchMyRooms(String userId) {
     return _rooms
         .where('memberIds', arrayContains: userId)
-        .snapshots()
+        .snapshots(includeMetadataChanges: true)
+        .where((snapshot) => !snapshot.metadata.isFromCache)
         .map((snapshot) {
           final rooms = snapshot.docs
               .map((document) => Room.fromMap(document.id, document.data()))

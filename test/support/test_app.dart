@@ -296,6 +296,11 @@ class FakeExpenseRepository implements ExpenseRepository {
   final expensesByRoom = <String, List<Expense>>{};
 
   @override
+  Stream<List<Expense>> watchExpenses(String roomId) async* {
+    yield List.of(expensesByRoom[roomId] ?? const []);
+  }
+
+  @override
   Future<List<Expense>> getExpenses(String roomId) async =>
       List.of(expensesByRoom[roomId] ?? const []);
 

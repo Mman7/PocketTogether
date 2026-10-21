@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/expense.dart';
@@ -10,6 +12,31 @@ class FirebaseExpenseRepository implements ExpenseRepository {
 
   CollectionReference<Map<String, dynamic>> _expenses(String roomId) =>
       _firestore.collection('rooms').doc(roomId).collection('expenses');
+
+  @override
+  Stream<List<Expense>> watchExpenses(String roomId) {
+    return _expenses(roomId)
+        .orderBy('expenseDate', descending: true)
+        .snapshots(includeMetadataChanges: true)
+        .where((snapshot) => !snapshot.metadata.isFromCache)
+        .map(
+          (snapshot) => snapshot.docs
+              .map((document) => Expense.fromMap(document.id, document.data()))
+              .toList(),
+        )
+        .transform(
+          StreamTransformer.fromHandlers(
+            handleError: (error, stackTrace, sink) {
+              sink.addError(
+                const ExpenseFailure(
+                  'Unable to load expenses. Please try again.',
+                ),
+                stackTrace,
+              );
+            },
+          ),
+        );
+  }
 
   @override
   Future<List<Expense>> getExpenses(String roomId) async {

@@ -25,6 +25,7 @@ class RoomDashboardPage extends StatefulWidget {
     required this.currentUserDisplayName,
     required this.roomRepository,
     required this.expenseRepository,
+    required this.onDeleted,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class RoomDashboardPage extends StatefulWidget {
   final String currentUserDisplayName;
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
+  final VoidCallback onDeleted;
 
   @override
   State<RoomDashboardPage> createState() => _RoomDashboardPageState();
@@ -83,9 +85,6 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     List<RoomMember> members,
     AsyncSnapshot<List<RoomMember>> memberSnapshot,
   ) {
-    final nameById = {
-      for (final member in members) member.userId: member.displayName,
-    };
     final today = state.expenses.where((expense) {
       final date = expense.expenseDate;
       final now = DateTime.now();
@@ -252,43 +251,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               ),
             ),
           const SizedBox(height: 20),
-          SectionHeading(
-            "Today's expenses",
-            trailing: TextButton(
-              onPressed: () => _openSection('History', members),
-              child: const Text('View all'),
-            ),
+          _RoomExpensesSection(
+            roomCurrency: widget.room.currency,
+            members: members,
+            currentUserId: widget.currentUserId,
+            onViewAll: () => _openSection('History', members),
+            onExpenseTap: (expense) => _openExpense(expense, members),
           ),
-          const SizedBox(height: 5),
-          // loading state
-          if (state.isLoading && state.expenses.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (state.expenses.isEmpty && state.errorMessage == null)
-            const _RoomEmptyState()
-          else
-            for (final expense in today.take(5)) ...[
-              _FirestoreExpenseTile(
-                expense: expense,
-                amount: formatCurrency(
-                  expense.amountInCents,
-                  currency: widget.room.currency,
-                ),
-                paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
-                createdByCurrentUser:
-                    expense.createdByUserId == widget.currentUserId,
-                onTap: () => _openExpense(expense, members),
-              ),
-              const SizedBox(height: 8),
-            ],
-          if (!state.isLoading && state.expenses.isNotEmpty && today.isEmpty)
-            const Text(
-              'No expenses today',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.muted),
-            ),
           const SizedBox(height: 16),
           SectionHeading(
             "Who's in this room",
@@ -804,6 +773,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     setState(() => _deletingRoom = true);
     try {
       await widget.roomRepository.deleteRoom(roomId: widget.room.id);
+      widget.onDeleted();
       if (mounted) Navigator.of(context).pop();
     } on RoomFailure catch (error) {
       if (mounted) {
@@ -936,6 +906,82 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _RoomExpensesSection extends StatelessWidget {
+  const _RoomExpensesSection({
+    required this.roomCurrency,
+    required this.members,
+    required this.currentUserId,
+    required this.onViewAll,
+    required this.onExpenseTap,
+  });
+
+  final String? roomCurrency;
+  final List<RoomMember> members;
+  final String currentUserId;
+  final VoidCallback onViewAll;
+  final ValueChanged<Expense> onExpenseTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<ExpenseCubit, ExpenseState>(
+      builder: (context, state) {
+        final today = state.expenses.where((expense) {
+          final date = expense.expenseDate;
+          final now = DateTime.now();
+          return date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day;
+        }).toList();
+        final nameById = {
+          for (final member in members) member.userId: member.displayName,
+        };
+
+        return Column(
+          children: [
+            SectionHeading(
+              "Today's expenses",
+              trailing: TextButton(
+                onPressed: onViewAll,
+                child: const Text('View all'),
+              ),
+            ),
+            const SizedBox(height: 5),
+            if (state.isLoading && state.expenses.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (state.expenses.isEmpty && state.errorMessage == null)
+              const _RoomEmptyState()
+            else
+              for (final expense in today.take(5)) ...[
+                _FirestoreExpenseTile(
+                  expense: expense,
+                  amount: formatCurrency(
+                    expense.amountInCents,
+                    currency: roomCurrency,
+                  ),
+                  paidByName:
+                      nameById[expense.paidByUserId] ?? 'Unknown member',
+                  createdByCurrentUser:
+                      expense.createdByUserId == currentUserId,
+                  onTap: () => onExpenseTap(expense),
+                ),
+                const SizedBox(height: 8),
+              ],
+            if (!state.isLoading && state.expenses.isNotEmpty && today.isEmpty)
+              const Text(
+                'No expenses today',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.muted),
+              ),
+          ],
+        );
+      },
     );
   }
 }

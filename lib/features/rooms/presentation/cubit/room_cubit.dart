@@ -110,6 +110,13 @@ class RoomCubit extends Cubit<RoomState> {
     }
   }
 
+  void removeRoom(String roomId) {
+    if (isClosed) return;
+    final rooms = state.rooms.where((room) => room.id != roomId).toList();
+    if (rooms.length == state.rooms.length) return;
+    emit(state.copyWith(rooms: rooms));
+  }
+
   Future<RoomJoinResult?> joinRoom({required String inviteCode}) async {
     if (state.isLoading || state.isJoining) return null;
 
