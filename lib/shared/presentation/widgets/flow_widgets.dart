@@ -191,15 +191,25 @@ class PrimaryButton extends StatelessWidget {
 }
 
 class SectionHeading extends StatelessWidget {
-  const SectionHeading(this.title, {this.trailing, super.key});
+  const SectionHeading(
+    this.title, {
+    required this.icon,
+    this.iconColors,
+    this.trailing,
+    super.key,
+  });
 
   final String title;
   final Widget? trailing;
+  final IconData icon;
+  final Color? iconColors;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
+        Icon(icon, size: 24, color: iconColors ?? AppColors.primary),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             title,

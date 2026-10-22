@@ -135,6 +135,12 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
         children: [
           SurfaceCard(
             padding: const EdgeInsets.all(17),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2168EE), Color(0xFF388BFA)],
+            ),
+            shadowColor: Color(0x332373F4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -143,13 +149,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                     const Expanded(
                       child: Text(
                         'Total spent',
-                        style: TextStyle(color: AppColors.muted, fontSize: 12),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ),
                     StatusPill(
                       label: _periodLabel,
-                      color: AppColors.paleBlue,
-                      textColor: Colors.grey,
+                      color: Colors.white24,
+                      textColor: Colors.white,
                     ),
                   ],
                 ),
@@ -157,6 +163,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                 Text(
                   formatCurrency(total, currency: widget.room.currency),
                   style: const TextStyle(
+                    color: AppColors.white,
                     fontSize: 33,
                     fontWeight: FontWeight.w800,
                     fontFeatures: [FontFeature.tabularFigures()],
@@ -165,13 +172,14 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                 const SizedBox(height: 14),
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.paleBlue.withValues(alpha: 0.64),
+                    color: Colors.white.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(13),
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   child: Row(
                     children: [
                       _Metric(
+                        icon: Icons.today,
                         label: 'Today',
                         value: formatCurrency(
                           today.fold<int>(
@@ -181,60 +189,101 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                           currency: widget.room.currency,
                         ),
                       ),
-                      _Metric(label: 'Members', value: '${members.length}'),
+                      // divided line
+                      const SizedBox(
+                        height: 68,
+                        child: VerticalDivider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          width: 12,
+                          endIndent: 8,
+                          indent: 8,
+                        ),
+                      ),
                       _Metric(
+                        icon: Icons.groups_outlined,
+                        label: 'Members',
+                        value: '${members.length}',
+                      ),
+                      const SizedBox(
+                        height: 68,
+                        child: VerticalDivider(
+                          color: Colors.white24,
+                          thickness: 1,
+                          width: 12,
+                          endIndent: 8,
+                          indent: 8,
+                        ),
+                      ),
+                      _Metric(
+                        icon: Icons.receipt_long_outlined,
                         label: 'Expenses',
                         value: '${state.expenses.length}',
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    for (final action in const [
-                      _QuickAction('Members', Icons.groups_outlined),
-                      _QuickAction('Settle', Icons.call_split_rounded),
-                      _QuickAction('Stats', Icons.bar_chart_rounded),
-                    ])
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => _openSection(action.label, members),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 39,
-                                  height: 39,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.paleBlue,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    action.icon,
-                                    size: 19,
-                                    color: AppColors.primary,
-                                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              for (final action in const [
+                _QuickAction('Members', Icons.groups_outlined),
+                _QuickAction('Settle', Icons.call_split_rounded),
+                _QuickAction('Stats', Icons.bar_chart_rounded),
+                _QuickAction('History', Icons.bar_chart_rounded),
+              ])
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      right: action.label == 'Stats' ? 0 : 6,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        onTap: () => _openSection(action.label, members),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primary.withAlpha(20),
                                 ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  action.label,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                child: Icon(
+                                  action.icon,
+                                  size: 24,
+                                  color: AppColors.primary,
                                 ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                action.label,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                  ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           if (state.errorMessage != null)
@@ -261,6 +310,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
           const SizedBox(height: 16),
           SectionHeading(
             "Who's in this room",
+            icon: Icons.people_rounded,
             trailing: StatusPill(
               label: '${members.length} members',
               color: AppColors.paleBlue,
@@ -830,7 +880,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
   }
 }
 
-class _RoomExpenseHistoryPage extends StatelessWidget {
+class _RoomExpenseHistoryPage extends StatefulWidget {
   const _RoomExpenseHistoryPage({
     required this.room,
     required this.members,
@@ -844,9 +894,17 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
   final String currentUserDisplayName;
 
   @override
+  State<_RoomExpenseHistoryPage> createState() =>
+      _RoomExpenseHistoryPageState();
+}
+
+class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
+  int? _selectedMonthKey;
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${room.name} expenses')),
+      appBar: AppBar(title: Text('${widget.room.name} expenses')),
       body: BlocBuilder<ExpenseCubit, ExpenseState>(
         builder: (context, state) {
           if (state.isLoading && state.expenses.isEmpty) {
@@ -859,8 +917,9 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
                 children: [
                   Text(state.errorMessage!),
                   TextButton(
-                    onPressed: () =>
-                        context.read<ExpenseCubit>().loadExpenses(room.id),
+                    onPressed: () => context.read<ExpenseCubit>().loadExpenses(
+                      widget.room.id,
+                    ),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -870,43 +929,120 @@ class _RoomExpenseHistoryPage extends StatelessWidget {
           if (state.expenses.isEmpty) {
             return const Center(child: Text('No expenses yet.'));
           }
+
+          final monthKeys =
+              state.expenses
+                  .map((expense) => _monthKey(expense.expenseDate))
+                  .toSet()
+                  .toList()
+                ..sort((first, second) => second.compareTo(first));
+          final selectedMonthKey = monthKeys.contains(_selectedMonthKey)
+              ? _selectedMonthKey!
+              : monthKeys.first;
+          final groupedExpenses = <int, List<Expense>>{};
+          for (final expense in state.expenses) {
+            final key = _monthKey(expense.expenseDate);
+            if (key == selectedMonthKey) {
+              groupedExpenses.putIfAbsent(key, () => []).add(expense);
+            }
+          }
+          for (final expenses in groupedExpenses.values) {
+            expenses.sort(
+              (first, second) =>
+                  second.expenseDate.compareTo(first.expenseDate),
+            );
+          }
           final nameById = {
-            for (final member in members) member.userId: member.displayName,
+            for (final member in widget.members)
+              member.userId: member.displayName,
           };
-          return ListView.separated(
-            padding: const EdgeInsets.all(18),
-            itemCount: state.expenses.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final expense = state.expenses[index];
-              return _FirestoreExpenseTile(
-                expense: expense,
-                amount: formatCurrency(
-                  expense.amountInCents,
-                  currency: room.currency,
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: selectedMonthKey,
+                decoration: const InputDecoration(
+                  labelText: 'Filter by month',
+                  prefixIcon: Icon(Icons.calendar_month_outlined),
                 ),
-                paidByName: nameById[expense.paidByUserId] ?? 'Unknown member',
-                createdByCurrentUser: expense.createdByUserId == currentUserId,
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
-                    builder: (_) => BlocProvider.value(
-                      value: context.read<ExpenseCubit>(),
-                      child: ExpenseDetailPage(
-                        room: room,
-                        expense: expense,
-                        members: members,
-                        currentUserId: currentUserId,
-                        currentUserDisplayName: currentUserDisplayName,
+                items: [
+                  for (final monthKey in monthKeys)
+                    DropdownMenuItem(
+                      value: monthKey,
+                      child: Text(_formatMonth(monthKey)),
+                    ),
+                ],
+                onChanged: (value) {
+                  if (value != null) setState(() => _selectedMonthKey = value);
+                },
+              ),
+              const SizedBox(height: 16),
+              for (final entry in groupedExpenses.entries) ...[
+                Text(
+                  _formatMonth(entry.key),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                for (final expense in entry.value) ...[
+                  _FirestoreExpenseTile(
+                    expense: expense,
+                    amount: formatCurrency(
+                      expense.amountInCents,
+                      currency: widget.room.currency,
+                    ),
+                    paidByName:
+                        nameById[expense.paidByUserId] ?? 'Unknown member',
+                    createdByCurrentUser:
+                        expense.createdByUserId == widget.currentUserId,
+                    onTap: () => Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => BlocProvider.value(
+                          value: context.read<ExpenseCubit>(),
+                          child: ExpenseDetailPage(
+                            room: widget.room,
+                            expense: expense,
+                            members: widget.members,
+                            currentUserId: widget.currentUserId,
+                            currentUserDisplayName:
+                                widget.currentUserDisplayName,
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
+                  const SizedBox(height: 8),
+                ],
+              ],
+            ],
           );
         },
       ),
     );
+  }
+
+  int _monthKey(DateTime date) => date.year * 100 + date.month;
+
+  String _formatMonth(int monthKey) {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final year = monthKey ~/ 100;
+    final month = monthKey % 100;
+    return '${monthNames[month - 1]} $year';
   }
 }
 
@@ -941,9 +1077,11 @@ class _RoomExpensesSection extends StatelessWidget {
         };
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SectionHeading(
               "Today's expenses",
+              icon: Icons.wallet,
               trailing: TextButton(
                 onPressed: onViewAll,
                 child: const Text('View all'),
@@ -994,26 +1132,33 @@ class _QuickAction {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value});
+  const _Metric({required this.label, required this.value, required this.icon});
 
   final String label;
   final String value;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: Column(
         children: [
+          Icon(icon, size: 26, color: AppColors.white),
+          const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            style: const TextStyle(fontSize: 12, color: AppColors.white),
           ),
           const SizedBox(height: 4),
           Text(
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.white,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ],
       ),

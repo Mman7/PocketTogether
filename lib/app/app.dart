@@ -106,7 +106,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AuthCubit(_authRepository, _profileRepository),
+      lazy: false,
+      create: (_) =>
+          AuthCubit(_authRepository, _profileRepository)..restoreSession(),
       child: MaterialApp.router(
         title: 'PocketTogether',
         debugShowCheckedModeBanner: false,

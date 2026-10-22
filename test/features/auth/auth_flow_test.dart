@@ -67,6 +67,17 @@ void main() {
     expect(find.text('Your rooms'), findsOneWidget);
   });
 
+  testWidgets('restores a missing profile for an existing session', (
+    tester,
+  ) async {
+    final harness = TestAppHarness(signedIn: true);
+    await pumpTestApp(tester, harness);
+
+    expect(find.text('Your rooms'), findsOneWidget);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    expect(harness.profileRepository.profiles['test-user'], isNotNull);
+  });
+
   testWidgets('registration enforces password rules and creates a profile', (
     tester,
   ) async {

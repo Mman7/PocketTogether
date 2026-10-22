@@ -150,6 +150,7 @@ class _RoomsPageState extends State<RoomsPage> {
               const SizedBox(height: 26),
               SectionHeading(
                 'Your rooms',
+                icon: Icons.people_rounded,
                 trailing: StatusPill(label: '${roomState.rooms.length}'),
               ),
               const SizedBox(height: 14),

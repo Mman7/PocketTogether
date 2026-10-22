@@ -31,25 +31,20 @@ class ExpenseDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final expenseState = context.watch<ExpenseCubit>().state;
     var currentExpense = expense;
+    final isUserCreated = currentExpense.createdByUserId == currentUserId;
     for (final savedExpense in expenseState.expenses) {
       if (savedExpense.id == expense.id) {
         currentExpense = savedExpense;
         break;
       }
     }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
           'Expense details',
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
         ),
-        actions: [
-          IconButton(
-            tooltip: 'More actions',
-            onPressed: () => _showActions(context, currentExpense),
-            icon: const Icon(Icons.more_horiz_rounded),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
@@ -195,25 +190,27 @@ class ExpenseDetailPage extends StatelessWidget {
                 style: const TextStyle(color: AppColors.danger),
               ),
             ),
-          PrimaryButton(
-            label: 'Edit expense',
-            icon: Icons.edit_outlined,
-            onPressed: () => _edit(context, currentExpense),
-          ),
+          if (isUserCreated)
+            PrimaryButton(
+              label: 'Edit expense',
+              icon: Icons.edit_outlined,
+              onPressed: () => _edit(context, currentExpense),
+            ),
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: () => _confirmDelete(context, currentExpense),
-            icon: const Icon(Icons.delete_outline_rounded),
-            label: const Text('Delete expense'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(0, 50),
-              foregroundColor: AppColors.danger,
-              side: const BorderSide(color: Color(0xFFE8BFC0)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.control),
+          if (isUserCreated)
+            OutlinedButton.icon(
+              onPressed: () => _confirmDelete(context, currentExpense),
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Delete expense'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 50),
+                foregroundColor: AppColors.danger,
+                side: const BorderSide(color: Color(0xFFE8BFC0)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -291,38 +288,6 @@ class ExpenseDetailPage extends StatelessWidget {
       );
       if (deleted && context.mounted) Navigator.pop(context);
     }
-  }
-
-  void _showActions(BuildContext context, Expense currentExpense) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit expense'),
-              onTap: () {
-                Navigator.pop(context);
-                _edit(context, currentExpense);
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.delete_outline_rounded,
-                color: AppColors.danger,
-              ),
-              title: const Text('Delete expense'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(context, currentExpense);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 

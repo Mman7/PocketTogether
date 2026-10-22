@@ -202,6 +202,7 @@ class RoomSettlePage extends StatelessWidget {
               const SizedBox(height: 17),
               SectionHeading(
                 'Suggested settlements',
+                icon: Icons.swap_horiz_rounded,
                 trailing: StatusPill(
                   label: '${settlements.length} pending',
                   color: AppColors.accent,
@@ -225,7 +226,10 @@ class RoomSettlePage extends StatelessWidget {
                   const SizedBox(height: 9),
                 ],
               const SizedBox(height: 16),
-              const SectionHeading('Net balances'),
+              const SectionHeading(
+                'Net balances',
+                icon: Icons.account_balance_wallet_rounded,
+              ),
               const SizedBox(height: 10),
               SurfaceCard(
                 child: Column(

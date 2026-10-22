@@ -97,7 +97,10 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
               const SizedBox(height: 22),
-              const SectionHeading('Help & account'),
+              const SectionHeading(
+                'Help & account',
+                icon: Icons.help_outline_rounded,
+              ),
               const SizedBox(height: 8),
               SurfaceCard(
                 padding: EdgeInsets.zero,

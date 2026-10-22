@@ -55,6 +55,15 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> signOut() => _authRepository.signOut();
 
+  Future<void> restoreSession() async {
+    if (!_authRepository.isSignedIn) return;
+    try {
+      await _ensureProfileExists();
+    } on ProfileFailure {
+      // Keep the Firebase session; the next data request can show the retry state.
+    }
+  }
+
   Future<void> _ensureProfileExists() async {
     final user = _authRepository.currentUser;
     if (user == null) return;

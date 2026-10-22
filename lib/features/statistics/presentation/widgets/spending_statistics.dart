@@ -133,7 +133,10 @@ class _SpendingStatisticsState extends State<SpendingStatistics> {
         SurfaceCard(
           child: Column(
             children: [
-              const SectionHeading('Spending by category'),
+              const SectionHeading(
+                'Spending by category',
+                icon: Icons.category_rounded,
+              ),
               const SizedBox(height: 12),
               if (summary.byCategory.isEmpty)
                 const _EmptyLine('No spending in this period.')
@@ -156,7 +159,10 @@ class _SpendingStatisticsState extends State<SpendingStatistics> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SectionHeading('Spending by member'),
+              const SectionHeading(
+                'Spending by member',
+                icon: Icons.person_rounded,
+              ),
               const SizedBox(height: 14),
               if (summary.byMember.isEmpty)
                 const _EmptyLine('No spending in this period.')
