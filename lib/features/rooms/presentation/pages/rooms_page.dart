@@ -212,11 +212,13 @@ class _RoomsPageState extends State<RoomsPage> {
     final balances = ledgerState.netBalanceByCurrency(userId);
     final currency = balances.keys.isNotEmpty ? balances.keys.first : 'MYR';
     final balance = balances[currency] ?? 0;
-    final status = balance == 0
-        ? 'In balance'
-        : balance > 0
-        ? 'You are owed'
-        : 'You owe';
+    final totalSpendByCurrency = ledgerState.totalSpendByCurrency();
+    final totalSpendLabel = totalSpendByCurrency.isEmpty
+        ? formatCurrency(0, currency: 'MYR')
+        : totalSpendByCurrency.entries
+              .map((entry) => formatCurrency(entry.value, currency: entry.key))
+              .join(' · ');
+
     return SurfaceCard(
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
@@ -246,17 +248,13 @@ class _RoomsPageState extends State<RoomsPage> {
                     color: Colors.black.withValues(alpha: 0.1),
                   ),
                   Spacer(),
-                  const Text(
-                    'Updated just now',
-                    style: TextStyle(fontSize: 11, color: AppColors.white),
-                  ),
                 ],
               );
             },
           ),
           const SizedBox(height: 19),
           const Text(
-            'Monthly Household',
+            'Total spend',
             style: TextStyle(color: AppColors.white, fontSize: 13),
           ),
           const SizedBox(height: 1),
@@ -265,7 +263,7 @@ class _RoomsPageState extends State<RoomsPage> {
             children: [
               Expanded(
                 child: Text(
-                  formatCurrency(balance.abs(), currency: currency),
+                  totalSpendLabel,
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -274,11 +272,6 @@ class _RoomsPageState extends State<RoomsPage> {
                     fontFeatures: [FontFeature.tabularFigures()],
                   ),
                 ),
-              ),
-              StatusPill(
-                label: status,
-                textColor: Colors.white,
-                color: Colors.white.withValues(alpha: 0.2),
               ),
             ],
           ),

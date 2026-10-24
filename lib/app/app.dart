@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../features/auth/data/auth_repository.dart';
 import '../features/auth/data/firebase_auth_repository.dart';
 import '../features/auth/presentation/cubit/auth_cubit.dart';
+import '../features/auth/presentation/cubit/auth_state.dart';
 import '../features/auth/presentation/pages/auth_pages.dart';
 import '../features/expenses/data/expense_repository.dart';
 import '../features/expenses/data/firebase_expense_repository.dart';
@@ -42,6 +43,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final ProfileRepository _profileRepository;
   late final RoomRepository _roomRepository;
   late final ExpenseRepository _expenseRepository;
+  late final AuthCubit _authCubit;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
 
@@ -59,17 +61,32 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _expenseRepository =
         widget.expenseRepository ??
         FirebaseExpenseRepository(FirebaseFirestore.instance);
-    _authStateRefresh = _AuthStateRefresh(_authRepository.authStateChanges);
+
+    _authCubit = AuthCubit(
+      authRepository: _authRepository,
+      profileRepository: _profileRepository,
+      firebaseAuth: widget.authRepository == null
+          ? FirebaseAuth.instance
+          : null,
+    );
+    _authStateRefresh = _AuthStateRefresh(_authCubit);
+    unawaited(_authCubit.initialize());
     _router = GoRouter(
-      initialLocation: '/rooms',
+      initialLocation: _authRepository.isSignedIn ? '/rooms' : '/login',
       refreshListenable: _authStateRefresh,
       redirect: (context, state) {
         final isAuthRoute = switch (state.matchedLocation) {
           '/login' || '/register' || '/forgot-password' => true,
           _ => false,
         };
-        if (!_authRepository.isSignedIn && !isAuthRoute) return '/login';
-        if (_authRepository.isSignedIn && isAuthRoute) return '/rooms';
+        final authState = _authCubit.state;
+        final isAuthenticated =
+            authState is Authenticated ||
+            authState is AuthenticatedSession ||
+            ((authState is AuthInitial || authState is AuthValidatingProfile) &&
+                _authRepository.isSignedIn);
+        if (isAuthenticated && isAuthRoute) return '/rooms';
+        if (!isAuthenticated && !isAuthRoute) return '/login';
         return null;
       },
       routes: [
@@ -100,15 +117,14 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   void dispose() {
     _router.dispose();
     _authStateRefresh.dispose();
+    _authCubit.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      lazy: false,
-      create: (_) =>
-          AuthCubit(_authRepository, _profileRepository)..restoreSession(),
+    return BlocProvider.value(
+      value: _authCubit,
       child: MaterialApp.router(
         title: 'PocketTogether',
         debugShowCheckedModeBanner: false,
@@ -120,11 +136,12 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
 }
 
 class _AuthStateRefresh extends ChangeNotifier {
-  _AuthStateRefresh(Stream<bool> authStateChanges) {
-    _subscription = authStateChanges.listen((_) => notifyListeners());
+  _AuthStateRefresh(AuthCubit authCubit) : _authCubit = authCubit {
+    _subscription = _authCubit.stream.listen((_) => notifyListeners());
   }
 
-  late final StreamSubscription<bool> _subscription;
+  final AuthCubit _authCubit;
+  late final StreamSubscription<AuthState> _subscription;
 
   @override
   void dispose() {

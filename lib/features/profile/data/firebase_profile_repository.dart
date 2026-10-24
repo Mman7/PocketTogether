@@ -32,9 +32,9 @@ class FirebaseProfileRepository implements ProfileRepository {
   }) async {
     try {
       final document = _users.doc(uid);
-      final snapshot = await document.get();
+      final snapshot = await document.get(GetOptions(source: Source.server));
       if (!snapshot.exists) {
-        await document.set(_newProfileData(displayName, email));
+        // await document.set(_newProfileData(displayName, email));
       } else if (snapshot.data()?['email'] != email.trim()) {
         await document.set({'email': email.trim()}, SetOptions(merge: true));
       }

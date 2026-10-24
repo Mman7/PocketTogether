@@ -85,17 +85,19 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     List<RoomMember> members,
     AsyncSnapshot<List<RoomMember>> memberSnapshot,
   ) {
+    final now = DateTime.now();
     final today = state.expenses.where((expense) {
       final date = expense.expenseDate;
-      final now = DateTime.now();
       return date.year == now.year &&
           date.month == now.month &&
           date.day == now.day;
     }).toList();
-    final total = state.expenses.fold<int>(
-      0,
-      (sum, expense) => sum + expense.amountInCents,
-    );
+    final total = state.expenses
+        .where((expense) {
+          final date = expense.expenseDate;
+          return date.year == now.year && date.month == now.month;
+        })
+        .fold<int>(0, (sum, expense) => sum + expense.amountInCents);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -237,9 +239,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               ])
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.only(
-                      right: action.label == 'Stats' ? 0 : 6,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Material(
                       color: Colors.transparent,
                       borderRadius: BorderRadius.circular(12),
@@ -250,6 +250,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
                             color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -264,7 +271,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                                 ),
                                 child: Icon(
                                   action.icon,
-                                  size: 24,
+                                  size: 20,
                                   color: AppColors.primary,
                                 ),
                               ),
@@ -334,7 +341,24 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     );
   }
 
-  String get _periodLabel => 'All time';
+  String get _periodLabel {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final now = DateTime.now();
+    return '${monthNames[now.month - 1]} ${now.year}';
+  }
 
   Widget _buildRoomDrawer(List<RoomMember> members) {
     return Drawer(
@@ -900,11 +924,52 @@ class _RoomExpenseHistoryPage extends StatefulWidget {
 
 class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
   int? _selectedMonthKey;
+  String _selectedCategory = 'All';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${widget.room.name} expenses')),
+      backgroundColor: const Color(0xFFF7F9FC),
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    '${widget.room.name} expenses',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 7),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.success,
+                    shape: BoxShape.circle,
+                  ),
+                  child: SizedBox(width: 8, height: 8),
+                ),
+              ],
+            ),
+            Text(
+              '${widget.members.length} active members · Shared room',
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
       body: BlocBuilder<ExpenseCubit, ExpenseState>(
         builder: (context, state) {
           if (state.isLoading && state.expenses.isEmpty) {
@@ -936,15 +1001,36 @@ class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
                   .toSet()
                   .toList()
                 ..sort((first, second) => second.compareTo(first));
-          final selectedMonthKey = monthKeys.contains(_selectedMonthKey)
-              ? _selectedMonthKey!
-              : monthKeys.first;
-          final groupedExpenses = <int, List<Expense>>{};
+          final selectedMonthKey = _selectedMonthKey ?? monthKeys.first;
+          final categories = <String>{
+            'All',
+            ...state.expenses.map((expense) => expense.category),
+          }.toList();
+          final selectedExpenses = state.expenses
+              .where(
+                (expense) => _monthKey(expense.expenseDate) == selectedMonthKey,
+              )
+              .toList();
+          final filteredExpenses = selectedExpenses
+              .where(
+                (expense) =>
+                    _selectedCategory == 'All' ||
+                    expense.category == _selectedCategory,
+              )
+              .toList();
+          final groupedExpenses = <String, List<Expense>>{};
+          final today = DateTime.now();
           for (final expense in state.expenses) {
-            final key = _monthKey(expense.expenseDate);
-            if (key == selectedMonthKey) {
-              groupedExpenses.putIfAbsent(key, () => []).add(expense);
-            }
+            if (!filteredExpenses.contains(expense)) continue;
+            final date = expense.expenseDate;
+            final day = DateTime(date.year, date.month, date.day);
+            final currentDay = DateTime(today.year, today.month, today.day);
+            final label = day == currentDay
+                ? 'Today'
+                : day == currentDay.subtract(const Duration(days: 1))
+                ? 'Yesterday'
+                : _formatDate(date);
+            groupedExpenses.putIfAbsent(label, () => []).add(expense);
           }
           for (final expenses in groupedExpenses.values) {
             expenses.sort(
@@ -956,66 +1042,149 @@ class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
             for (final member in widget.members)
               member.userId: member.displayName,
           };
+          final groupTotal = state.expenses.fold<int>(
+            0,
+            (sum, expense) => sum + expense.amountInCents,
+          );
+          final paid = selectedExpenses
+              .where((expense) => expense.paidByUserId == widget.currentUserId)
+              .fold<int>(0, (sum, expense) => sum + expense.amountInCents);
+          final theyPaid = selectedExpenses
+              .where((expense) => expense.paidByUserId != widget.currentUserId)
+              .fold<int>(0, (sum, expense) => sum + expense.amountInCents);
+          final balance = selectedExpenses.fold<int>(0, (sum, expense) {
+            final owed = expense.splitAmountsInCents[widget.currentUserId] ?? 0;
+            return sum +
+                (expense.paidByUserId == widget.currentUserId
+                    ? expense.amountInCents - owed
+                    : -owed);
+          });
           return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
             children: [
-              DropdownButtonFormField<int>(
-                initialValue: selectedMonthKey,
-                decoration: const InputDecoration(
-                  labelText: 'Filter by month',
-                  prefixIcon: Icon(Icons.calendar_month_outlined),
+              _RoomLedgerSummary(
+                total: formatCurrency(
+                  groupTotal,
+                  currency: widget.room.currency,
                 ),
-                items: [
-                  for (final monthKey in monthKeys)
-                    DropdownMenuItem(
-                      value: monthKey,
-                      child: Text(_formatMonth(monthKey)),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value != null) setState(() => _selectedMonthKey = value);
-                },
+                paid: formatCurrency(paid, currency: widget.room.currency),
+                theyPaid: formatCurrency(
+                  theyPaid,
+                  currency: widget.room.currency,
+                ),
+                balance: formatCurrency(
+                  balance.abs(),
+                  currency: widget.room.currency,
+                ),
+                positiveBalance: balance >= 0,
+                memberNames: widget.members
+                    .where((member) => member.userId != widget.currentUserId)
+                    .map((member) => member.displayName)
+                    .take(2)
+                    .join(' & '),
               ),
-              const SizedBox(height: 16),
-              for (final entry in groupedExpenses.entries) ...[
-                Text(
-                  _formatMonth(entry.key),
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Categories',
+                    style: TextStyle(color: AppColors.muted, fontSize: 13),
                   ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _selectedCategory = 'All';
+                    }),
+                    child: const Text('Clear filters'),
+                  ),
+                ],
+              ),
+              SizedBox(
+                height: 38,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: categories.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, index) {
+                    final category = categories[index];
+                    return ChoiceChip(
+                      label: Text(category),
+                      selected: _selectedCategory == category,
+                      onSelected: (_) =>
+                          setState(() => _selectedCategory = category),
+                      showCheckmark: false,
+                      avatar: Icon(
+                        categoryIcon(category),
+                        size: 16,
+                        color: _selectedCategory == category
+                            ? AppColors.primary
+                            : Colors.black.withAlpha(255),
+                      ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 8),
-                for (final expense in entry.value) ...[
-                  _FirestoreExpenseTile(
-                    expense: expense,
-                    amount: formatCurrency(
-                      expense.amountInCents,
-                      currency: widget.room.currency,
+              ),
+              if (filteredExpenses.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 36),
+                  child: Center(
+                    child: Text(
+                      'No expenses for this month',
+                      style: TextStyle(color: AppColors.muted),
                     ),
-                    paidByName:
-                        nameById[expense.paidByUserId] ?? 'Unknown member',
-                    createdByCurrentUser:
-                        expense.createdByUserId == widget.currentUserId,
-                    onTap: () => Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
-                        builder: (_) => BlocProvider.value(
-                          value: context.read<ExpenseCubit>(),
-                          child: ExpenseDetailPage(
-                            room: widget.room,
-                            expense: expense,
-                            members: widget.members,
-                            currentUserId: widget.currentUserId,
-                            currentUserDisplayName:
-                                widget.currentUserDisplayName,
+                  ),
+                )
+              else
+                for (final entry in groupedExpenses.entries) ...[
+                  _RoomExpenseDateHeading(
+                    label: entry.key,
+                    monthLabel: _formatMonth(selectedMonthKey),
+                    total: entry.value.fold<int>(
+                      0,
+                      (sum, expense) => sum + expense.amountInCents,
+                    ),
+                    currency: widget.room.currency,
+                    onMonthSelected: entry.key == groupedExpenses.keys.first
+                        ? () => _selectMonth(monthKeys)
+                        : null,
+                  ),
+                  for (final expense in entry.value) ...[
+                    _FirestoreExpenseTile(
+                      expense: expense,
+                      amount: formatCurrency(
+                        expense.amountInCents,
+                        currency: widget.room.currency,
+                      ),
+                      paidByName:
+                          nameById[expense.paidByUserId] ?? 'Unknown member',
+                      createdByCurrentUser:
+                          expense.createdByUserId == widget.currentUserId,
+                      onTap: () => Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => BlocProvider.value(
+                            value: context.read<ExpenseCubit>(),
+                            child: ExpenseDetailPage(
+                              room: widget.room,
+                              expense: expense,
+                              members: widget.members,
+                              currentUserId: widget.currentUserId,
+                              currentUserDisplayName:
+                                  widget.currentUserDisplayName,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 10),
+                  ],
                 ],
-              ],
+              const SizedBox(height: 16),
+              const Center(
+                child: Text(
+                  'All transactions settled and synced',
+                  style: TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ),
             ],
           );
         },
@@ -1024,6 +1193,15 @@ class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
   }
 
   int _monthKey(DateTime date) => date.year * 100 + date.month;
+
+  Future<void> _selectMonth(List<int> availableMonthKeys) async {
+    final selectedMonthKey = await showDialog<int>(
+      context: context,
+      builder: (_) => _MonthPickerDialog(monthKeys: availableMonthKeys),
+    );
+    if (!mounted || selectedMonthKey == null) return;
+    setState(() => _selectedMonthKey = selectedMonthKey);
+  }
 
   String _formatMonth(int monthKey) {
     const monthNames = [
@@ -1043,6 +1221,197 @@ class _RoomExpenseHistoryPageState extends State<_RoomExpenseHistoryPage> {
     final year = monthKey ~/ 100;
     final month = monthKey % 100;
     return '${monthNames[month - 1]} $year';
+  }
+
+  String _formatDate(DateTime date) =>
+      '${date.day} ${_formatMonth(_monthKey(date)).split(' ').first}';
+}
+
+class _RoomLedgerSummary extends StatelessWidget {
+  const _RoomLedgerSummary({
+    required this.total,
+    required this.paid,
+    required this.theyPaid,
+    required this.balance,
+    required this.positiveBalance,
+    required this.memberNames,
+  });
+
+  final String total;
+  final String paid;
+  final String theyPaid;
+  final String balance;
+  final bool positiveBalance;
+  final String memberNames;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF172238), Color(0xFF0D172B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x220B1425),
+            blurRadius: 18,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'TOTAL GROUP SPENDING',
+                        style: TextStyle(
+                          color: Color(0xFF9AA8BC),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.7,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        '$total',
+                        style: const TextStyle(
+                          color: AppColors.white,
+                          fontSize: 34,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  color: Color(0xFF50D6B0),
+                ),
+              ],
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(color: Color(0x334A5A73), height: 1),
+            ),
+            // TODO add a chart here
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: Divider(color: Color(0x334A5A73), height: 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RoomExpenseDateHeading extends StatelessWidget {
+  const _RoomExpenseDateHeading({
+    required this.label,
+    required this.monthLabel,
+    required this.total,
+    required this.currency,
+    this.onMonthSelected,
+  });
+
+  final String label;
+  final String monthLabel;
+  final int total;
+  final String? currency;
+  final VoidCallback? onMonthSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18, bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          if (onMonthSelected != null)
+            Row(
+              children: [
+                // show selected month
+                StatusPill(label: monthLabel),
+                IconButton(
+                  icon: const Icon(Icons.calendar_month_rounded, size: 16),
+                  tooltip: 'Choose month',
+                  onPressed: onMonthSelected,
+                ),
+              ],
+            ),
+          const Spacer(),
+
+          StatusPill(label: formatCurrency(total, currency: currency)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MonthPickerDialog extends StatelessWidget {
+  const _MonthPickerDialog({required this.monthKeys});
+
+  final List<int> monthKeys;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Choose month'),
+      content: SizedBox(
+        width: 320,
+        child: GridView.builder(
+          shrinkWrap: true,
+          itemCount: monthKeys.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 1.8,
+          ),
+          itemBuilder: (context, index) {
+            final monthKey = monthKeys[index];
+            return OutlinedButton(
+              onPressed: () => Navigator.of(context).pop(monthKey),
+              child: Text(_formatMonth(monthKey), textAlign: TextAlign.center),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  String _formatMonth(int monthKey) {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final month = monthKey % 100;
+    return '${monthNames[month - 1].substring(0, 3)} ${monthKey ~/ 100}';
   }
 }
 

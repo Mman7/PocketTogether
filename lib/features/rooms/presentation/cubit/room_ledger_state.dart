@@ -11,6 +11,23 @@ class RoomLedgerState {
   final bool isLoading;
   final String? errorMessage;
 
+  /// Total expense amount across all loaded rooms, keyed by currency.
+  Map<String, int> totalSpendByCurrency() {
+    final totals = <String, int>{};
+    for (final ledger in ledgers) {
+      final total = ledger.expenses.fold<int>(
+        0,
+        (sum, expense) => sum + expense.amountInCents,
+      );
+      totals.update(
+        ledger.currency,
+        (value) => value + total,
+        ifAbsent: () => total,
+      );
+    }
+    return totals;
+  }
+
   /// Net balance of [userId] across all rooms, keyed by currency.
   ///
   /// Each currency is kept separate because rooms do not share one.

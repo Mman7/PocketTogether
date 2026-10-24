@@ -23,7 +23,6 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    context.read<AuthCubit>().reset();
   }
 
   @override
@@ -42,6 +41,17 @@ class _LoginPageState extends State<LoginPage> {
         children: [
           if (authState.errorMessage != null) ...[
             _AuthMessage(message: authState.errorMessage!, isError: true),
+            if (authState is AuthValidationError)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: authState.isLoading
+                      ? null
+                      : () => context.read<AuthCubit>().initialize(force: true),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                ),
+              ),
             const SizedBox(height: 16),
           ],
           Form(
@@ -97,26 +107,20 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ),
           PrimaryButton(
-            label: authState.status == AuthStatus.loading
-                ? 'Signing in...'
-                : 'Log in',
-            icon: authState.status == AuthStatus.loading
+            label: authState.isLoading ? 'Signing in...' : 'Log in',
+            icon: authState.isLoading
                 ? Icons.hourglass_top_rounded
                 : Icons.login_rounded,
-            onPressed: authState.status == AuthStatus.loading ? null : _submit,
+            onPressed: authState.isLoading ? null : _submit,
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: authState.status == AuthStatus.loading
-                  ? null
-                  : _signInWithGoogle,
+              onPressed: authState.isLoading ? null : _signInWithGoogle,
               icon: const Icon(Icons.g_mobiledata_rounded, size: 24),
               label: Text(
-                authState.status == AuthStatus.loading
-                    ? 'Signing in...'
-                    : 'Continue with Google',
+                authState.isLoading ? 'Signing in...' : 'Continue with Google',
               ),
             ),
           ),
@@ -326,13 +330,13 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
           const SizedBox(height: 20),
           PrimaryButton(
-            label: authState.status == AuthStatus.loading
+            label: authState.isLoading
                 ? 'Creating account...'
                 : 'Create account',
-            icon: authState.status == AuthStatus.loading
+            icon: authState.isLoading
                 ? Icons.hourglass_top_rounded
                 : Icons.person_add_alt_rounded,
-            onPressed: authState.status == AuthStatus.loading ? null : _submit,
+            onPressed: authState.isLoading ? null : _submit,
           ),
           const SizedBox(height: 12),
           Center(
@@ -392,7 +396,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, authState) {
-        final sent = authState.status == AuthStatus.success;
+        final sent = authState.isSuccess;
         return AuthFrame(
           title: sent ? 'Check your inbox' : 'Reset your password',
           subtitle: sent
@@ -427,15 +431,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               const SizedBox(height: 18),
               PrimaryButton(
-                label: authState.status == AuthStatus.loading
-                    ? 'Sending...'
-                    : 'Send reset link',
-                icon: authState.status == AuthStatus.loading
+                label: authState.isLoading ? 'Sending...' : 'Send reset link',
+                icon: authState.isLoading
                     ? Icons.hourglass_top_rounded
                     : Icons.send_rounded,
-                onPressed: authState.status == AuthStatus.loading
-                    ? null
-                    : _submit,
+                onPressed: authState.isLoading ? null : _submit,
               ),
             ],
             Center(

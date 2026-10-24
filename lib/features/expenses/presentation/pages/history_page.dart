@@ -35,7 +35,7 @@ class _HistoryPageState extends State<HistoryPage> {
   final _searchController = TextEditingController();
   String _category = 'All';
   String _memberId = '';
-  String _date = 'All time';
+  int? _selectedMonthKey;
 
   @override
   void dispose() {
@@ -58,6 +58,12 @@ class _HistoryPageState extends State<HistoryPage> {
       'All',
       ...entries.map((entry) => entry.expense.category),
     }.toList();
+    final monthKeys =
+        entries
+            .map((entry) => _monthKey(entry.expense.expenseDate))
+            .toSet()
+            .toList()
+          ..sort((first, second) => second.compareTo(first));
     final totals = <String, int>{};
     for (final entry in filtered) {
       totals.update(
@@ -175,26 +181,34 @@ class _HistoryPageState extends State<HistoryPage> {
                 children: [
                   const Icon(
                     Icons.calendar_month_outlined,
-                    size: 17,
+                    size: 16,
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 7),
-                  PopupMenuButton<String>(
-                    tooltip: 'Filter by date',
-                    onSelected: (value) => setState(() => _date = value),
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: 'All time', child: Text('All time')),
-                      PopupMenuItem(
-                        value: 'This week',
-                        child: Text('This week'),
-                      ),
-                      PopupMenuItem(value: 'Today', child: Text('Today')),
+                  PopupMenuButton<int>(
+                    tooltip: 'Choose month',
+                    onSelected: (value) => setState(
+                      () => _selectedMonthKey = value == -1 ? null : value,
+                    ),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: -1, child: Text('All months')),
+                      for (final monthKey in monthKeys)
+                        PopupMenuItem(
+                          value: monthKey,
+                          child: Text(_formatMonth(monthKey)),
+                        ),
                     ],
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _date,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                          _selectedMonthKey == null
+                              ? 'All months'
+                              : _formatMonth(_selectedMonthKey!),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
                       ],
@@ -236,30 +250,19 @@ class _HistoryPageState extends State<HistoryPage> {
   ];
 
   List<_HistoryEntry> _filter(List<_HistoryEntry> entries) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
     final query = _searchController.text.trim().toLowerCase();
     return entries.where((entry) {
       final expense = entry.expense;
       final text =
           '${expense.note ?? ''} ${expense.category} ${_memberName(entry.ledger, expense.paidByUserId)}'
               .toLowerCase();
-      final date = DateTime(
-        expense.expenseDate.year,
-        expense.expenseDate.month,
-        expense.expenseDate.day,
-      );
-      final dateMatches = switch (_date) {
-        'Today' => date == today,
-        'This week' => !date.isBefore(
-          today.subtract(Duration(days: now.weekday - 1)),
-        ),
-        _ => true,
-      };
+      final monthMatches =
+          _selectedMonthKey == null ||
+          _monthKey(expense.expenseDate) == _selectedMonthKey;
       return (query.isEmpty || text.contains(query)) &&
           (_category == 'All' || expense.category == _category) &&
           (_memberId.isEmpty || expense.paidByUserId == _memberId) &&
-          dateMatches;
+          monthMatches;
     }).toList()..sort(
       (a, b) => b.expense.expenseDate.compareTo(a.expense.expenseDate),
     );
@@ -305,6 +308,26 @@ class _HistoryPageState extends State<HistoryPage> {
     if (value == today) return 'Today';
     if (value == today.subtract(const Duration(days: 1))) return 'Yesterday';
     return 'Earlier';
+  }
+
+  int _monthKey(DateTime date) => date.year * 100 + date.month;
+
+  String _formatMonth(int monthKey) {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${monthNames[monthKey % 100 - 1]} ${monthKey ~/ 100}';
   }
 
   Future<void> _openExpense(_HistoryEntry entry) async {

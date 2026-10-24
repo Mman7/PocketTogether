@@ -7,7 +7,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
 
-// TODO test the feature
 Future<void> testLocalFunction(FirebaseFunctions functions) async {
   try {
     final callable = functions.httpsCallable('helloFromLocal');
