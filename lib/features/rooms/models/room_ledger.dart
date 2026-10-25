@@ -9,11 +9,13 @@ class RoomLedger {
     required this.room,
     required this.members,
     required this.expenses,
+    this.personalAllTimeInCents,
   });
 
   final Room room;
   final List<RoomMember> members;
   final List<Expense> expenses;
+  final int? personalAllTimeInCents;
 
   String get currency => room.currency ?? 'MYR';
 

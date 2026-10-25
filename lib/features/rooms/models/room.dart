@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:json_annotation/json_annotation.dart';
 
+part 'room.g.dart';
+
+@JsonSerializable()
 class Room {
   final String id;
   final String name;
@@ -24,37 +28,26 @@ class Room {
   String? get createdBy => ownerId;
 
   Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'name': name,
-      'description': description,
-      'updatedAt': updatedAt?.toIso8601String(),
-      'createdAt': createdAt?.toIso8601String(),
-      'currency': currency,
-      'ownerId': ownerId,
-      'createdBy': ownerId,
-      'memberIds': memberIds,
-    };
+    return toJson()..['createdBy'] = ownerId;
   }
 
   factory Room.fromMap(String id, Map<String, dynamic> data) {
-    return Room(
-      id: id,
-      name: data['name'] as String,
-      createdAt: _parseDate(data['createdAt']),
-      updatedAt: _parseDate(data['updatedAt']),
-      description: data['description'] as String?,
-      currency: data['currency'] as String?,
-      ownerId: data['createdBy'] as String? ?? data['ownerId'] as String?,
-      memberIds:
-          (data['memberIds'] as List<dynamic>?)?.cast<String>() ?? const [],
-    );
+    final normalized = Map<String, dynamic>.from(data)
+      ..['id'] = id
+      ..['createdAt'] = _dateAsJson(data['createdAt'])
+      ..['updatedAt'] = _dateAsJson(data['updatedAt'])
+      ..['ownerId'] = data['createdBy'] ?? data['ownerId'];
+    return Room.fromJson(normalized);
   }
 
-  static DateTime? _parseDate(Object? value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
-    return null;
-  }
+  factory Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RoomToJson(this);
+}
+
+String? _dateAsJson(Object? value) {
+  if (value is Timestamp) return value.toDate().toIso8601String();
+  if (value is DateTime) return value.toIso8601String();
+  if (value is String) return value;
+  return null;
 }

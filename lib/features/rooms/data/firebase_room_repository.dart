@@ -11,7 +11,8 @@ import 'room_repository.dart';
 
 class FirebaseRoomRepository implements RoomRepository {
   FirebaseRoomRepository(this._firestore, {FirebaseFunctions? functions})
-    : _functions = functions ?? FirebaseFunctions.instance;
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;

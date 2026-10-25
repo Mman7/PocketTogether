@@ -1285,7 +1285,7 @@ class _RoomLedgerSummary extends StatelessWidget {
                       ),
                       const SizedBox(height: 7),
                       Text(
-                        '$total',
+                        total.toString(),
                         style: const TextStyle(
                           color: AppColors.white,
                           fontSize: 34,

@@ -19,23 +19,31 @@ service cloud.firestore {
       match /members/{userId} {
         allow read: if isRoomMember(roomId);
         allow create, update, delete: if false;
+
+        match /stats/{summaryId} {
+          allow read: if isRoomMember(roomId);
+          allow write: if false;
+        }
+
+        match /monthlyStats/{monthId} {
+          allow read: if isRoomMember(roomId);
+          allow write: if false;
+        }
+      }
+
+      match /stats/{summaryId} {
+        allow read: if isRoomMember(roomId);
+        allow write: if false;
+      }
+
+      match /monthlyStats/{monthId} {
+        allow read: if isRoomMember(roomId);
+        allow write: if false;
       }
 
       match /expenses/{expenseId} {
         allow read: if isRoomMember(roomId);
-        allow create: if isRoomMember(roomId) &&
-            request.resource.data.createdByUserId == request.auth.uid &&
-            request.resource.data.amountInCents is int &&
-            request.resource.data.amountInCents > 0 &&
-            request.resource.data.paidByUserId is string &&
-            request.resource.data.splitAmountsInCents is map;
-        allow update: if isRoomMember(roomId) &&
-            request.resource.data.createdByUserId == resource.data.createdByUserId &&
-            request.resource.data.amountInCents is int &&
-            request.resource.data.amountInCents > 0 &&
-            request.resource.data.paidByUserId is string &&
-            request.resource.data.splitAmountsInCents is map;
-        allow delete: if isRoomMember(roomId);
+        allow create, update, delete: if false;
       }
     }
 

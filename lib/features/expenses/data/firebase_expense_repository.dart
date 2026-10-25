@@ -1,14 +1,18 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../models/expense.dart';
 import 'expense_repository.dart';
 
 class FirebaseExpenseRepository implements ExpenseRepository {
-  FirebaseExpenseRepository(this._firestore);
+  FirebaseExpenseRepository(this._firestore, {FirebaseFunctions? functions})
+    : _functions =
+          functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> _expenses(String roomId) =>
       _firestore.collection('rooms').doc(roomId).collection('expenses');
@@ -66,8 +70,14 @@ class FirebaseExpenseRepository implements ExpenseRepository {
         createdAt: now,
         updatedAt: now,
       );
-      await document.set(savedExpense.toMap());
+      await _functions.httpsCallable('createExpense').call<void>({
+        'roomId': roomId,
+        'expenseId': document.id,
+        ..._callableData(savedExpense),
+      });
       return savedExpense;
+    } on FirebaseFunctionsException catch (error) {
+      throw ExpenseFailure(_functionMessage(error, 'Unable to save expense.'));
     } on FirebaseException {
       throw const ExpenseFailure('Unable to save expense. Please try again.');
     }
@@ -86,8 +96,16 @@ class FirebaseExpenseRepository implements ExpenseRepository {
       final updatedExpense = expense.copyWith(
         updatedAt: DateTime.now().toUtc(),
       );
-      await _expenses(roomId).doc(expense.id).update(updatedExpense.toMap());
+      await _functions.httpsCallable('updateExpense').call<void>({
+        'roomId': roomId,
+        'expenseId': expense.id,
+        ..._callableData(updatedExpense),
+      });
       return updatedExpense;
+    } on FirebaseFunctionsException catch (error) {
+      throw ExpenseFailure(
+        _functionMessage(error, 'Unable to update expense.'),
+      );
     } on FirebaseException {
       throw const ExpenseFailure('Unable to update expense. Please try again.');
     }
@@ -99,7 +117,14 @@ class FirebaseExpenseRepository implements ExpenseRepository {
     required String expenseId,
   }) async {
     try {
-      await _expenses(roomId).doc(expenseId).delete();
+      await _functions.httpsCallable('deleteExpense').call<void>({
+        'roomId': roomId,
+        'expenseId': expenseId,
+      });
+    } on FirebaseFunctionsException catch (error) {
+      throw ExpenseFailure(
+        _functionMessage(error, 'Unable to delete expense.'),
+      );
     } on FirebaseException {
       throw const ExpenseFailure('Unable to delete expense. Please try again.');
     }
@@ -114,5 +139,27 @@ class FirebaseExpenseRepository implements ExpenseRepository {
         !expense.hasValidSplit) {
       throw const ExpenseFailure('Expense amount or split is invalid.');
     }
+  }
+
+  Map<String, dynamic> _callableData(Expense expense) {
+    final data = expense.toJson()..remove('id');
+    // Callable arguments must be JSON-compatible; generated DateTime values
+    // are ISO strings and are parsed by the backend.
+    return data;
+  }
+
+  String _functionMessage(FirebaseFunctionsException error, String fallback) {
+    return switch (error.code) {
+      'unauthenticated' => 'Sign in to continue.',
+      'permission-denied' =>
+        'You do not have permission to change this expense.',
+      'invalid-argument' => error.message ?? 'The expense is invalid.',
+      'not-found' => 'The expense or room could not be found.',
+      'already-exists' =>
+        'This expense was already submitted. Please refresh and try again.',
+      'failed-precondition' =>
+        error.message ?? 'The stored expense data is invalid.',
+      _ => fallback,
+    };
   }
 }

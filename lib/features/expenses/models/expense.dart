@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:json_annotation/json_annotation.dart';
 
+part 'expense.g.dart';
+
+@JsonSerializable()
 class Expense {
   final String id;
   final int amountInCents;
@@ -69,48 +73,44 @@ class Expense {
   }
 
   factory Expense.fromMap(String id, Map<String, dynamic> data) {
-    DateTime? parseDate(dynamic value) {
-      if (value is Timestamp) return value.toDate();
-      if (value is DateTime) return value;
-      return null;
+    final normalized = Map<String, dynamic>.from(data)
+      ..['id'] = id
+      ..['expenseDate'] = _dateAsJson(data['expenseDate']);
+    if (data['createdAt'] != null) {
+      normalized['createdAt'] = _dateAsJson(data['createdAt']);
     }
-
-    final rawSplits =
-        data['splitAmountsInCents'] as Map<String, dynamic>? ?? {};
-
-    return Expense(
-      id: id,
-      amountInCents: data['amountInCents'] as int,
-      category: data['category'] as String,
-      note: data['note'] as String?,
-      paidByUserId: data['paidByUserId'] as String,
-      createdByUserId: data['createdByUserId'] as String,
-      transferMethod: data['transferMethod'] as String?,
-      transferToUserId: data['transferToUserId'] as String?,
-      splitAmountsInCents: rawSplits.map(
+    if (data['updatedAt'] != null) {
+      normalized['updatedAt'] = _dateAsJson(data['updatedAt']);
+    }
+    final rawSplits = data['splitAmountsInCents'] as Map<String, dynamic>?;
+    if (rawSplits != null) {
+      normalized['splitAmountsInCents'] = rawSplits.map(
         (key, value) => MapEntry(key, (value as num).toInt()),
-      ),
-      expenseDate: parseDate(data['expenseDate'])!,
-      createdAt: parseDate(data['createdAt']),
-      updatedAt: parseDate(data['updatedAt']),
-    );
+      );
+    }
+    return Expense.fromJson(normalized);
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'amountInCents': amountInCents,
-      'category': category,
-      'note': note,
-      'paidByUserId': paidByUserId,
-      'createdByUserId': createdByUserId,
-      'transferMethod': transferMethod,
-      'transferToUserId': transferToUserId,
-      'splitAmountsInCents': splitAmountsInCents,
-      'expenseDate': Timestamp.fromDate(expenseDate),
-      'createdAt': createdAt == null
+    final data = toJson()
+      ..['expenseDate'] = Timestamp.fromDate(expenseDate)
+      ..['createdAt'] = createdAt == null
           ? FieldValue.serverTimestamp()
-          : Timestamp.fromDate(createdAt!),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
+          : Timestamp.fromDate(createdAt!)
+      ..['updatedAt'] = FieldValue.serverTimestamp();
+    data.remove('id');
+    return data;
   }
+
+  factory Expense.fromJson(Map<String, dynamic> json) =>
+      _$ExpenseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$ExpenseToJson(this);
+}
+
+String? _dateAsJson(Object? value) {
+  if (value is Timestamp) return value.toDate().toIso8601String();
+  if (value is DateTime) return value.toIso8601String();
+  if (value is String) return value;
+  return null;
 }

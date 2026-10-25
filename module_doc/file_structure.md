@@ -17,14 +17,14 @@ This project uses a **Feature-first + Layered Architecture**.
 
 ```text
 UI / Page
-   ↓
+    ↓
 Cubit
-   ↓
-Repository
-   ↓
-Repository Implementation
-   ↓
-Firebase
+    ↓
+Repository contract
+    ↓
+Firebase repository implementation
+    ↓
+Firestore reads / callable Cloud Functions
 ```
 
 ### Main Layers
@@ -62,11 +62,11 @@ Handles data access.
 ```text
 data/
 ├── expense_repository.dart
-└── expense_repository_impl.dart
+└── firebase_expense_repository.dart
 ```
 
 - `Repository` — Defines available operations
-- `RepositoryImpl` — Implements Firebase/Firestore operations
+- `FirebaseRepository` — Implements Firestore reads and callable Function writes
 
 #### Services
 
@@ -123,10 +123,8 @@ AddExpensePage
 ExpensesCubit
       ↓
 ExpenseRepository
-      ↓
-ExpenseRepositoryImpl
-      ↓
-Cloud Firestore
+    ├── watch/read expenses → Cloud Firestore
+    └── create/update/delete → Callable Cloud Functions
 ```
 
 Realtime data flows back through the same layers:
@@ -141,6 +139,29 @@ Cubit
 State
     ↓
 UI
+```
+
+Expense mutations are authoritative on the backend. Cloud Functions validate
+the request, check room membership, write the expense, and update summaries in
+one Firestore transaction. Flutter reads the resulting expense and summary
+documents through repository implementations.
+
+The statistics data layer is split into focused files:
+
+```text
+features/statistics/data/
+├── expense_statistics_model.dart
+├── expense_statistics_repository.dart
+└── firebase_expense_statistics_repository.dart
+```
+
+Room entry screens are also kept as separate page files:
+
+```text
+features/rooms/presentation/pages/
+├── create_room_page.dart
+├── room_created_page.dart
+└── join_room_page.dart
 ```
 
 ## Principles

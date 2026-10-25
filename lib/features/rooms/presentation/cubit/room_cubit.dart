@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/room_repository.dart';
@@ -92,13 +91,9 @@ class RoomCubit extends Cubit<RoomState> {
       emit(state.copyWith(isLoading: false, rooms: rooms, createdRoom: result));
     } on RoomFailure catch (error) {
       if (!isClosed) {
-        debugPrint(
-          'createRoom failed: code=${error.code ?? 'unknown'} message=${error.message}',
-        );
         emit(state.copyWith(isLoading: false, errorMessage: error.message));
       }
-    } catch (error, stackTrace) {
-      debugPrint('createRoom failed unexpectedly: $error\n$stackTrace');
+    } catch (_) {
       if (!isClosed) {
         emit(
           state.copyWith(

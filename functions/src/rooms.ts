@@ -118,7 +118,6 @@ export async function createRoomHandler(
   db: Firestore = firestore,
 ): Promise<RoomResult> {
   const uid = requireUid(request);
-  console.log('createRoomHandler called', { uid });
   const data = asRecord(request.data);
   const name = typeof data['name'] === 'string' ? data['name'].trim() : '';
   if (name.length < 1 || name.length > 80) {

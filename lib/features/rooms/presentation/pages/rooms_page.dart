@@ -11,6 +11,7 @@ import '../../../expenses/presentation/pages/history_page.dart';
 import '../../../profile/data/profile_repository.dart';
 import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
+import '../../../statistics/data/expense_statistics_repository.dart';
 import '../../data/room_repository.dart';
 import '../cubit/room_ledger_cubit.dart';
 import '../cubit/room_ledger_state.dart';
@@ -19,7 +20,8 @@ import '../cubit/room_state.dart';
 import '../../models/room.dart';
 import '../../../statistics/presentation/pages/statistics_page.dart';
 import 'room_dashboard_page.dart';
-import 'room_entry_pages.dart';
+import 'create_room_page.dart';
+import 'join_room_page.dart';
 
 class RoomsPage extends StatefulWidget {
   const RoomsPage({
@@ -27,6 +29,7 @@ class RoomsPage extends StatefulWidget {
     required this.profileRepository,
     required this.roomRepository,
     required this.expenseRepository,
+    required this.statisticsRepository,
     this.currentUser,
     super.key,
   });
@@ -35,6 +38,7 @@ class RoomsPage extends StatefulWidget {
   final ProfileRepository profileRepository;
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
+  final ExpenseStatisticsRepository statisticsRepository;
   final AuthUser? currentUser;
 
   @override
@@ -54,6 +58,8 @@ class _RoomsPageState extends State<RoomsPage> {
     _ledgerCubit = RoomLedgerCubit(
       roomRepository: widget.roomRepository,
       expenseRepository: widget.expenseRepository,
+      statisticsRepository: widget.statisticsRepository,
+      userId: widget.currentUser?.uid ?? '',
     );
   }
 
@@ -208,10 +214,6 @@ class _RoomsPageState extends State<RoomsPage> {
     RoomState roomState,
     RoomLedgerState ledgerState,
   ) {
-    final userId = widget.currentUser?.uid ?? '';
-    final balances = ledgerState.netBalanceByCurrency(userId);
-    final currency = balances.keys.isNotEmpty ? balances.keys.first : 'MYR';
-    final balance = balances[currency] ?? 0;
     final totalSpendByCurrency = ledgerState.totalSpendByCurrency();
     final totalSpendLabel = totalSpendByCurrency.isEmpty
         ? formatCurrency(0, currency: 'MYR')

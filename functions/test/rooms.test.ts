@@ -11,6 +11,10 @@ import {
   joinRoomHandler,
   removeRoomMemberHandler,
 } from '../src/rooms';
+import {
+  createExpenseHandler,
+  rebuildExpenseSummariesHandler,
+} from '../src/expenses';
 
 type TestRequest = CallableRequest<Record<string, unknown>>;
 
@@ -48,6 +52,28 @@ test('room callables reject unauthenticated requests', async () => {
   await expectHttpsError(
     getRoomMembersHandler(request({ roomId: 'room-id' })),
     'unauthenticated',
+  );
+});
+
+test('expense callables reject unauthenticated requests', async () => {
+  await expectHttpsError(
+    createExpenseHandler(request({ roomId: 'room-id' })),
+    'unauthenticated',
+  );
+  await expectHttpsError(
+    rebuildExpenseSummariesHandler(request({ roomId: 'room-id' })),
+    'unauthenticated',
+  );
+});
+
+test('expense callables validate required data before Firestore access', async () => {
+  await expectHttpsError(
+    createExpenseHandler(request({ roomId: 'room-id' }, 'user-id')),
+    'invalid-argument',
+  );
+  await expectHttpsError(
+    rebuildExpenseSummariesHandler(request({ roomId: 'room-id' }, 'user-id')),
+    'permission-denied',
   );
 });
 

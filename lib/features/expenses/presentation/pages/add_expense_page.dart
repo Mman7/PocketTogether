@@ -472,7 +472,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
       transferMethod: _isTransfer ? _transferMethod : null,
       transferToUserId: _isTransfer ? _transferToUserId : null,
       splitAmountsInCents: _splitAmounts(splitIds, amountInCents),
-      expenseDate: DateTime(_date.year, _date.month, _date.day),
+      // Summary month boundaries are calculated in UTC by the Functions.
+      expenseDate: DateTime.utc(_date.year, _date.month, _date.day),
       createdAt: previous?.createdAt,
       updatedAt: previous?.updatedAt,
     );

@@ -1,8 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../expenses/data/expense_repository.dart';
+import '../../../expenses/models/expense.dart';
+import '../../../statistics/data/expense_statistics_model.dart';
+import '../../../statistics/data/expense_statistics_repository.dart';
 import '../../data/room_repository.dart';
 import '../../models/room.dart';
+import '../../models/room_member.dart';
 import '../../models/room_ledger.dart';
 import 'room_ledger_state.dart';
 
@@ -11,10 +15,14 @@ class RoomLedgerCubit extends Cubit<RoomLedgerState> {
   RoomLedgerCubit({
     required this.roomRepository,
     required this.expenseRepository,
+    required this.statisticsRepository,
+    required this.userId,
   }) : super(const RoomLedgerState());
 
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
+  final ExpenseStatisticsRepository statisticsRepository;
+  final String userId;
   List<Room> _rooms = const [];
   int _latestRequest = 0;
 
@@ -47,8 +55,17 @@ class RoomLedgerCubit extends Cubit<RoomLedgerState> {
   Future<void> refresh() => loadRooms(_rooms);
 
   Future<RoomLedger> _loadLedger(Room room) async {
-    final members = await roomRepository.getRoomMembers(room.id);
-    final expenses = await expenseRepository.getExpenses(room.id);
-    return RoomLedger(room: room, members: members, expenses: expenses);
+    final results = await Future.wait([
+      roomRepository.getRoomMembers(room.id),
+      expenseRepository.getExpenses(room.id),
+      statisticsRepository.getStatistics(roomId: room.id, userId: userId),
+    ]);
+    return RoomLedger(
+      room: room,
+      members: results[0] as List<RoomMember>,
+      expenses: results[1] as List<Expense>,
+      personalAllTimeInCents:
+          (results[2] as ExpenseStatistics).personalAllTimeInCents,
+    );
   }
 }

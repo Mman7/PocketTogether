@@ -1,5 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:json_annotation/json_annotation.dart';
+
 import 'room_role.dart';
 
+part 'room_member.g.dart';
+
+@JsonSerializable()
 class RoomMember {
   final String userId;
   final String displayName;
@@ -18,25 +24,26 @@ class RoomMember {
   bool get isOwner => role == RoomRole.owner;
 
   factory RoomMember.fromMap(String userId, Map<String, dynamic> data) {
-    final rawJoinedAt = data['joinedAt'];
-    final joinedAt = rawJoinedAt is String
-        ? DateTime.tryParse(rawJoinedAt)
-        : (rawJoinedAt as dynamic)?.toDate() as DateTime?;
-    return RoomMember(
-      userId: userId,
-      displayName: data['displayName'] as String? ?? 'Unknown',
-      email: data['email'] as String?,
-      role: data['role'] == 'owner' ? RoomRole.owner : RoomRole.member,
-      joinedAt: joinedAt,
-    );
+    return RoomMember.fromJson({
+      ...data,
+      'userId': userId,
+      'displayName': data['displayName'] ?? 'Unknown',
+      'role': data['role'] == 'owner' ? 'owner' : 'member',
+      'joinedAt': _dateAsJson(data['joinedAt']),
+    });
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'userId': userId,
-      'displayName': displayName,
-      if (email != null) 'email': email,
-      'joinedAt': joinedAt,
-    };
-  }
+  Map<String, dynamic> toMap() => toJson();
+
+  factory RoomMember.fromJson(Map<String, dynamic> json) =>
+      _$RoomMemberFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RoomMemberToJson(this);
+}
+
+String? _dateAsJson(Object? value) {
+  if (value is String) return value;
+  if (value is DateTime) return value.toIso8601String();
+  if (value is Timestamp) return value.toDate().toIso8601String();
+  return null;
 }

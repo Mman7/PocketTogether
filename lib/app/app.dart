@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +19,8 @@ import '../features/profile/data/profile_repository.dart';
 import '../features/rooms/data/firebase_room_repository.dart';
 import '../features/rooms/data/room_repository.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
+import '../features/statistics/data/expense_statistics_repository.dart';
+import '../features/statistics/data/firebase_expense_statistics_repository.dart';
 import 'theme/app_theme.dart';
 
 class PocketTogetherApp extends StatefulWidget {
@@ -26,6 +29,7 @@ class PocketTogetherApp extends StatefulWidget {
     this.profileRepository,
     this.roomRepository,
     this.expenseRepository,
+    this.functions,
     super.key,
   });
 
@@ -33,6 +37,7 @@ class PocketTogetherApp extends StatefulWidget {
   final ProfileRepository? profileRepository;
   final RoomRepository? roomRepository;
   final ExpenseRepository? expenseRepository;
+  final FirebaseFunctions? functions;
 
   @override
   State<PocketTogetherApp> createState() => _PocketTogetherAppState();
@@ -43,6 +48,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final ProfileRepository _profileRepository;
   late final RoomRepository _roomRepository;
   late final ExpenseRepository _expenseRepository;
+  late final ExpenseStatisticsRepository _statisticsRepository;
   late final AuthCubit _authCubit;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
@@ -55,12 +61,24 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _profileRepository =
         widget.profileRepository ??
         FirebaseProfileRepository(FirebaseFirestore.instance);
+    final functions =
+        widget.functions ??
+        FirebaseFunctions.instanceFor(region: 'us-central1');
     _roomRepository =
         widget.roomRepository ??
-        FirebaseRoomRepository(FirebaseFirestore.instance);
+        FirebaseRoomRepository(
+          FirebaseFirestore.instance,
+          functions: functions,
+        );
     _expenseRepository =
         widget.expenseRepository ??
-        FirebaseExpenseRepository(FirebaseFirestore.instance);
+        FirebaseExpenseRepository(
+          FirebaseFirestore.instance,
+          functions: functions,
+        );
+    _statisticsRepository = FirebaseExpenseStatisticsRepository(
+      FirebaseFirestore.instance,
+    );
 
     _authCubit = AuthCubit(
       authRepository: _authRepository,
@@ -69,8 +87,11 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
           ? FirebaseAuth.instance
           : null,
     );
+
     _authStateRefresh = _AuthStateRefresh(_authCubit);
     unawaited(_authCubit.initialize());
+
+    // Initialize the router after setting up authentication and state refresh
     _router = GoRouter(
       initialLocation: _authRepository.isSignedIn ? '/rooms' : '/login',
       refreshListenable: _authStateRefresh,
@@ -106,6 +127,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
             profileRepository: _profileRepository,
             roomRepository: _roomRepository,
             expenseRepository: _expenseRepository,
+            statisticsRepository: _statisticsRepository,
             onSignOut: () => context.read<AuthCubit>().signOut(),
           ),
         ),

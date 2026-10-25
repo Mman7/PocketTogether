@@ -7,21 +7,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
 
-Future<void> testLocalFunction(FirebaseFunctions functions) async {
-  try {
-    final callable = functions.httpsCallable('helloFromLocal');
-    final result = await callable.call({'name': 'Flutter'});
-
-    debugPrint('Function result: ${result.data}');
-  } on FirebaseFunctionsException catch (e) {
-    debugPrint('Function error code: ${e.code}');
-    debugPrint('Function error message: ${e.message}');
-    debugPrint('Function details: ${e.details}');
-  } catch (e) {
-    debugPrint('Unexpected error: $e');
-  }
-}
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -45,9 +30,5 @@ Future<void> main() async {
     functions.useFunctionsEmulator('10.0.2.2', 5001);
   }
 
-  if (useEmulators) {
-    await testLocalFunction(functions);
-  }
-
-  runApp(const PocketTogetherApp());
+  runApp(PocketTogetherApp(functions: functions));
 }
