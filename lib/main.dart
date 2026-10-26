@@ -7,6 +7,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
 
+// TODO check outside stats how it get data
+// TODO add timeline
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

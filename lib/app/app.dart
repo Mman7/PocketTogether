@@ -17,7 +17,9 @@ import '../features/expenses/data/firebase_expense_repository.dart';
 import '../features/profile/data/firebase_profile_repository.dart';
 import '../features/profile/data/profile_repository.dart';
 import '../features/rooms/data/firebase_room_repository.dart';
+import '../features/rooms/data/firebase_room_activity_repository.dart';
 import '../features/rooms/data/room_repository.dart';
+import '../features/rooms/data/room_activity_repository.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
 import '../features/statistics/data/expense_statistics_repository.dart';
 import '../features/statistics/data/firebase_expense_statistics_repository.dart';
@@ -29,6 +31,7 @@ class PocketTogetherApp extends StatefulWidget {
     this.profileRepository,
     this.roomRepository,
     this.expenseRepository,
+    this.activityRepository,
     this.functions,
     super.key,
   });
@@ -37,6 +40,7 @@ class PocketTogetherApp extends StatefulWidget {
   final ProfileRepository? profileRepository;
   final RoomRepository? roomRepository;
   final ExpenseRepository? expenseRepository;
+  final RoomActivityRepository? activityRepository;
   final FirebaseFunctions? functions;
 
   @override
@@ -49,6 +53,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
   late final RoomRepository _roomRepository;
   late final ExpenseRepository _expenseRepository;
   late final ExpenseStatisticsRepository _statisticsRepository;
+  late final RoomActivityRepository _activityRepository;
   late final AuthCubit _authCubit;
   late final _AuthStateRefresh _authStateRefresh;
   late final GoRouter _router;
@@ -79,6 +84,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _statisticsRepository = FirebaseExpenseStatisticsRepository(
       FirebaseFirestore.instance,
     );
+    _activityRepository =
+        widget.activityRepository ??
+        FirebaseRoomActivityRepository(FirebaseFirestore.instance);
 
     _authCubit = AuthCubit(
       authRepository: _authRepository,
@@ -127,6 +135,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
             profileRepository: _profileRepository,
             roomRepository: _roomRepository,
             expenseRepository: _expenseRepository,
+            activityRepository: _activityRepository,
             statisticsRepository: _statisticsRepository,
             onSignOut: () => context.read<AuthCubit>().signOut(),
           ),

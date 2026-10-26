@@ -1,4 +1,3 @@
-import '../../expenses/domain/balance_calculator.dart';
 import '../../expenses/models/expense.dart';
 import 'room.dart';
 import 'room_member.dart';
@@ -25,10 +24,4 @@ class RoomLedger {
     }
     return 'Unknown member';
   }
-
-  /// Net position per member in cents. Positive means owed money.
-  Map<String, int> get netBalances => calculateNetBalances(
-    memberIds: members.map((member) => member.userId),
-    expenses: expenses,
-  );
 }

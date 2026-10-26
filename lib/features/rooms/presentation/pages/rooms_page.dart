@@ -13,6 +13,7 @@ import '../../../profile/presentation/cubit/profile_cubit.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../statistics/data/expense_statistics_repository.dart';
 import '../../data/room_repository.dart';
+import '../../data/room_activity_repository.dart';
 import '../cubit/room_ledger_cubit.dart';
 import '../cubit/room_ledger_state.dart';
 import '../cubit/room_cubit.dart';
@@ -30,6 +31,7 @@ class RoomsPage extends StatefulWidget {
     required this.roomRepository,
     required this.expenseRepository,
     required this.statisticsRepository,
+    required this.activityRepository,
     this.currentUser,
     super.key,
   });
@@ -39,6 +41,7 @@ class RoomsPage extends StatefulWidget {
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
   final ExpenseStatisticsRepository statisticsRepository;
+  final RoomActivityRepository activityRepository;
   final AuthUser? currentUser;
 
   @override
@@ -113,7 +116,7 @@ class _RoomsPageState extends State<RoomsPage> {
                 currentUserDisplayName: displayName,
                 expenseRepository: widget.expenseRepository,
               ),
-              2 => const StatisticsPage(),
+              2 => StatisticsPage(currentUserId: widget.currentUser?.uid ?? ''),
               _ => ProfilePage(
                 user: widget.currentUser,
                 onSignOut: widget.onSignOut,
@@ -350,6 +353,7 @@ class _RoomsPageState extends State<RoomsPage> {
               : widget.currentUser?.email?.trim().split('@').first ?? 'Member',
           roomRepository: widget.roomRepository,
           expenseRepository: widget.expenseRepository,
+          activityRepository: widget.activityRepository,
           onDeleted: () => _roomCubit.removeRoom(room.id),
         ),
       ),
@@ -493,6 +497,7 @@ class _RoomPreviewPage extends StatelessWidget {
     required this.displayName,
     required this.roomRepository,
     required this.expenseRepository,
+    required this.activityRepository,
     required this.onDeleted,
   });
 
@@ -501,6 +506,7 @@ class _RoomPreviewPage extends StatelessWidget {
   final String displayName;
   final RoomRepository roomRepository;
   final ExpenseRepository expenseRepository;
+  final RoomActivityRepository activityRepository;
   final VoidCallback onDeleted;
 
   @override
@@ -511,6 +517,7 @@ class _RoomPreviewPage extends StatelessWidget {
       currentUserDisplayName: displayName,
       roomRepository: roomRepository,
       expenseRepository: expenseRepository,
+      activityRepository: activityRepository,
       onDeleted: onDeleted,
     );
   }

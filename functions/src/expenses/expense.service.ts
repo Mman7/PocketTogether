@@ -38,6 +38,11 @@ export class ExpenseService {
       }
       this.expenses.create(transaction, expenseRef, this.withCreateTimestamps(input));
       this.applyContribution(transaction, roomRef, input, 1);
+      this.logActivity(transaction, roomRef, 'expense_created', uid, input.expenseId, {
+        amountInCents: input.amountInCents,
+        category: input.category,
+        note: input.note ?? null,
+      });
     });
     return { expenseId: input.expenseId };
   }
@@ -61,6 +66,12 @@ export class ExpenseService {
       this.expenses.update(transaction, expenseRef, update);
       this.applyContribution(transaction, roomRef, previous, -1);
       this.applyContribution(transaction, roomRef, input, 1);
+      this.logActivity(transaction, roomRef, 'expense_updated', uid, input.expenseId, {
+        previousAmountInCents: previous.amountInCents,
+        amountInCents: input.amountInCents,
+        category: input.category,
+        note: input.note ?? null,
+      });
     });
     return { expenseId: input.expenseId };
   }
@@ -75,6 +86,11 @@ export class ExpenseService {
       await this.assertRoomMember(transaction, roomRef, uid, previous);
       this.expenses.delete(transaction, expenseRef);
       this.applyContribution(transaction, roomRef, previous, -1);
+      this.logActivity(transaction, roomRef, 'expense_deleted', uid, expenseId, {
+        amountInCents: previous.amountInCents,
+        category: previous.category,
+        note: previous.note ?? null,
+      });
     });
     return { expenseId };
   }
@@ -117,6 +133,24 @@ export class ExpenseService {
     for (const target of this.summary.contribution(expense, direction)) {
       this.summary.apply(transaction, roomRef, target);
     }
+  }
+
+  private logActivity(
+    transaction: Transaction,
+    roomRef: DocumentReference,
+    type: 'expense_created' | 'expense_updated' | 'expense_deleted',
+    actorUserId: string,
+    expenseId: string,
+    metadata: Record<string, unknown>,
+  ): void {
+    const activityRef = roomRef.collection('activityLogs').doc();
+    transaction.create(activityRef, {
+      type,
+      actorUserId,
+      expenseId,
+      createdAt: FieldValue.serverTimestamp(),
+      metadata,
+    });
   }
 
   private async assertRoomMember(

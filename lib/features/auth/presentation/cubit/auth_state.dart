@@ -48,5 +48,5 @@ class AuthValidationError extends AuthState {
 }
 
 class AuthFailure extends AuthState {
-  const AuthFailure({String? errorMessage}) : super(errorMessage: errorMessage);
+  const AuthFailure({super.errorMessage});
 }

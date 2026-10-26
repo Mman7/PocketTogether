@@ -46,7 +46,7 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     final ledgerState = context.watch<RoomLedgerCubit>().state;
-    final entries = _entriesFrom(ledgerState.ledgers);
+    final entries = _entriesFrom(ledgerState.ledgers, widget.currentUserId);
     final filtered = _filter(entries);
     final members = <String, String>{};
     for (final entry in entries) {
@@ -243,10 +243,15 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  List<_HistoryEntry> _entriesFrom(List<RoomLedger> ledgers) => [
+  List<_HistoryEntry> _entriesFrom(
+    List<RoomLedger> ledgers,
+    String currentUserId,
+  ) => [
     for (final ledger in ledgers)
       for (final expense in ledger.expenses)
-        if (expense.category != 'Transfer') _HistoryEntry(ledger, expense),
+        if (expense.category != 'Transfer' &&
+            expense.paidByUserId == currentUserId)
+          _HistoryEntry(ledger, expense),
   ];
 
   List<_HistoryEntry> _filter(List<_HistoryEntry> entries) {

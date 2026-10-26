@@ -12,6 +12,28 @@ Room creation, invite generation, and joining are handled by callable Functions:
 
 Room and invite writes are server-only. The client reads rooms through the signed-in user's `memberIds` membership query.
 
+## Expense summaries
+
+Expense creation, editing, and deletion use the callable Functions `createExpense`,
+`updateExpense`, and `deleteExpense`. Each transaction writes the expense and these
+derived documents together:
+
+```text
+rooms/{roomId}/stats/summary.totalExpenseInCents
+rooms/{roomId}/monthlyStats/{yyyy-MM}.totalExpenseInCents
+rooms/{roomId}/members/{userId}/stats/summary.totalPaidInCents
+rooms/{roomId}/members/{userId}/monthlyStats/{yyyy-MM}.totalPaidInCents
+```
+
+Month IDs use UTC `yyyy-MM` and are based on `expenseDate`. Missing summary documents
+read as zero in `FirebaseExpenseStatisticsRepository`. Clients can read summaries but
+cannot write them directly.
+
+For existing data, deploy the Functions first, grant a trusted maintenance account
+the Firebase Auth custom claim `admin: true`, then call `rebuildExpenseSummaries` once
+per room. The rebuild deletes and recomputes derived documents from the source
+expenses, so rerunning it is safe. Remove the claim after migration.
+
 ## Local Firebase emulators
 
 Install the Firebase CLI and authenticate once with `firebase login`. From the repository root:

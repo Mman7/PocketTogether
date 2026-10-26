@@ -1,30 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/widgets/empty_panel.dart';
 import '../../../../shared/presentation/widgets/page_header.dart';
-import '../../../rooms/models/room_ledger.dart';
+import '../../../expenses/models/expense.dart';
+import '../../../rooms/models/room_member.dart';
 import '../../../rooms/presentation/cubit/room_ledger_cubit.dart';
 import '../../../rooms/presentation/cubit/room_ledger_state.dart';
 import '../widgets/spending_statistics.dart';
 
 class StatisticsPage extends StatefulWidget {
-  const StatisticsPage({super.key});
+  const StatisticsPage({required this.currentUserId, super.key});
+
+  final String currentUserId;
 
   @override
   State<StatisticsPage> createState() => _StatisticsPageState();
 }
 
 class _StatisticsPageState extends State<StatisticsPage> {
-  String? _selectedRoomId;
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<RoomLedgerCubit, RoomLedgerState>(
       builder: (context, state) {
-        final ledgers = state.ledgers;
-        final selected = _selectedLedger(ledgers);
+        final expensesByCurrency = <String, List<Expense>>{};
+        final membersByCurrency = <String, List<RoomMember>>{};
+        for (final ledger in state.ledgers) {
+          final personalExpenses = ledger.expenses
+              .where((expense) => expense.paidByUserId == widget.currentUserId)
+              .toList();
+          if (personalExpenses.isEmpty) continue;
+          expensesByCurrency
+              .putIfAbsent(ledger.currency, () => [])
+              .addAll(personalExpenses);
+          final member = ledger.members.where(
+            (candidate) => candidate.userId == widget.currentUserId,
+          );
+          membersByCurrency
+              .putIfAbsent(ledger.currency, () => [])
+              .addAll(member);
+        }
 
         return CustomScrollView(
           key: const PageStorageKey('statistics-page'),
@@ -38,20 +53,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     subtitle: 'A clearer picture of where it goes.',
                   ),
                   const SizedBox(height: 17),
-                  if (selected != null) ...[
-                    _RoomSelector(
-                      ledgers: ledgers,
-                      selectedRoomId: selected.room.id,
-                      onSelected: (roomId) =>
-                          setState(() => _selectedRoomId = roomId),
-                    ),
-                    const SizedBox(height: 14),
-                    SpendingStatistics(
-                      currency: selected.room.currency,
-                      members: selected.members,
-                      expenses: selected.expenses,
-                    ),
-                  ] else if (state.isLoading)
+                  if (state.isLoading && state.ledgers.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 32),
                       child: Center(child: CircularProgressIndicator()),
@@ -63,11 +65,31 @@ class _StatisticsPageState extends State<StatisticsPage> {
                       message: state.errorMessage!,
                       compact: true,
                     )
+                  else if (expensesByCurrency.isNotEmpty)
+                    for (final entry in expensesByCurrency.entries) ...[
+                      if (expensesByCurrency.length > 1)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            entry.key,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      SpendingStatistics(
+                        currency: entry.key,
+                        members: membersByCurrency[entry.key] ?? const [],
+                        expenses: entry.value,
+                      ),
+                      const SizedBox(height: 18),
+                    ]
                   else
                     const EmptyPanel(
                       icon: Icons.insights_outlined,
-                      title: 'No rooms yet',
-                      message: 'Create or join a room to see its statistics.',
+                      title: 'No personal spending yet',
+                      message: 'Expenses you pay will appear here.',
                       compact: true,
                     ),
                 ],
@@ -76,61 +98,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
           ],
         );
       },
-    );
-  }
-
-  RoomLedger? _selectedLedger(List<RoomLedger> ledgers) {
-    if (ledgers.isEmpty) return null;
-    for (final ledger in ledgers) {
-      if (ledger.room.id == _selectedRoomId) return ledger;
-    }
-    return ledgers.first;
-  }
-}
-
-class _RoomSelector extends StatelessWidget {
-  const _RoomSelector({
-    required this.ledgers,
-    required this.selectedRoomId,
-    required this.onSelected,
-  });
-
-  final List<RoomLedger> ledgers;
-  final String selectedRoomId;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 38,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          for (final ledger in ledgers)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Text(ledger.room.name),
-                selected: ledger.room.id == selectedRoomId,
-                onSelected: (_) => onSelected(ledger.room.id),
-                showCheckmark: false,
-                side: BorderSide(
-                  color: ledger.room.id == selectedRoomId
-                      ? AppColors.primary
-                      : AppColors.border,
-                ),
-                backgroundColor: AppColors.white,
-                selectedColor: AppColors.paleBlue,
-                labelStyle: TextStyle(
-                  color: ledger.room.id == selectedRoomId
-                      ? AppColors.primary
-                      : AppColors.ink,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

@@ -45,6 +45,10 @@ service cloud.firestore {
         allow read: if isRoomMember(roomId);
         allow create, update, delete: if false;
       }
+        match /activityLogs/{activityId} {
+          allow read: if isRoomMember(roomId);
+          allow create, update, delete: if false;
+        }
     }
 
     match /roomInvites/{inviteCode} {

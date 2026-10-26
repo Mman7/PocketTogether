@@ -252,14 +252,16 @@ export async function deleteRoomHandler(
     if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
       throw new HttpsError('permission-denied', 'Only the room owner can delete the room.');
     }
-    const [memberSnapshot, expenseSnapshot, inviteSnapshot] = await Promise.all([
+    const [memberSnapshot, expenseSnapshot, inviteSnapshot, activitySnapshot] = await Promise.all([
       transaction.get(roomRef.collection('members')),
       transaction.get(roomRef.collection('expenses')),
       transaction.get(db.collection('roomInvites').where('roomId', '==', roomId)),
+      transaction.get(roomRef.collection('activityLogs')),
     ]);
     for (const document of memberSnapshot.docs) transaction.delete(document.ref);
     for (const document of expenseSnapshot.docs) transaction.delete(document.ref);
     for (const document of inviteSnapshot.docs) transaction.delete(document.ref);
+    for (const document of activitySnapshot.docs) transaction.delete(document.ref);
     transaction.delete(roomRef);
   });
 
@@ -300,6 +302,12 @@ export async function removeRoomMemberHandler(
     transaction.update(roomRef, {
       memberIds: FieldValue.arrayRemove(memberId),
       updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.create(roomRef.collection('activityLogs').doc(), {
+      type: 'member_left',
+      actorUserId: uid,
+      memberUserId: memberId,
+      createdAt: FieldValue.serverTimestamp(),
     });
   });
 
@@ -408,6 +416,12 @@ export async function joinRoomHandler(
     transaction.update(roomRef, {
       memberIds: FieldValue.arrayUnion(uid),
       updatedAt: now,
+    });
+    transaction.create(roomRef.collection('activityLogs').doc(), {
+      type: 'member_joined',
+      actorUserId: uid,
+      memberUserId: uid,
+      createdAt: now,
     });
     return { roomId, status: 'joined' };
   });

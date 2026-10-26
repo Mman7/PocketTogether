@@ -3,7 +3,8 @@ import '../../expenses/models/expense.dart';
 enum SpendingPeriod {
   day('Day', 'Today'),
   week('Week', 'This week'),
-  month('Month', 'This month');
+  month('Month', 'This month'),
+  sixMonths('6 Months', 'Last 6 months');
 
   const SpendingPeriod(this.toggleLabel, this.pillLabel);
 
@@ -42,17 +43,27 @@ class SpendingSummary {
     required Iterable<Expense> expenses,
     required SpendingPeriod period,
     DateTime? now,
+    DateTime? selectedMonth,
   }) {
     final today = _dateOnly(now ?? DateTime.now());
+    final month = selectedMonth == null
+        ? DateTime(today.year, today.month, 1)
+        : DateTime(selectedMonth.year, selectedMonth.month, 1);
+    final monthEnd = month.year == today.year && month.month == today.month
+        ? today
+        : DateTime(month.year, month.month + 1, 0);
     final start = switch (period) {
       SpendingPeriod.day => today,
       SpendingPeriod.week => DateTime(today.year, today.month, today.day - 6),
-      SpendingPeriod.month => DateTime(today.year, today.month, 1),
+      SpendingPeriod.month => month,
+      SpendingPeriod.sixMonths => DateTime(today.year, today.month - 5, 1),
     };
+    final end = period == SpendingPeriod.month ? monthEnd : today;
     final dayCount = switch (period) {
       SpendingPeriod.day => 1,
       SpendingPeriod.week => 7,
-      SpendingPeriod.month => today.day,
+      SpendingPeriod.month => end.difference(start).inDays + 1,
+      SpendingPeriod.sixMonths => today.difference(start).inDays + 1,
     };
 
     var total = 0;
@@ -62,7 +73,7 @@ class SpendingSummary {
     for (final expense in expenses) {
       if (expense.category == 'Transfer') continue;
       final date = _dateOnly(expense.expenseDate);
-      if (date.isBefore(start) || date.isAfter(today)) continue;
+      if (date.isBefore(start) || date.isAfter(end)) continue;
 
       total += expense.amountInCents;
       count++;
@@ -71,13 +82,11 @@ class SpendingSummary {
         (value) => value + expense.amountInCents,
         ifAbsent: () => expense.amountInCents,
       );
-      for (final split in expense.splitAmountsInCents.entries) {
-        memberTotals.update(
-          split.key,
-          (value) => value + split.value,
-          ifAbsent: () => split.value,
-        );
-      }
+      memberTotals.update(
+        expense.paidByUserId,
+        (value) => value + expense.amountInCents,
+        ifAbsent: () => expense.amountInCents,
+      );
     }
 
     final byCategory = categoryTotals.entries.toList()
