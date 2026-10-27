@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/money_format.dart';
@@ -90,45 +91,47 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('${widget.room.name} activity')),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _items.clear();
-            _hasMore = true;
-          });
-          await _loadPage();
-        },
-        child: _items.isEmpty && _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _items.isEmpty && _error != null
-            ? _ErrorView(message: _error!, onRetry: _loadPage)
-            : _items.isEmpty
-            ? const Center(child: Text('No activity yet.'))
-            : ListView.separated(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-                itemCount: _items.length + (_loading || _hasMore ? 1 : 0),
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (_, index) {
-                  if (index == _items.length) {
-                    return _error == null
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        : _ErrorView(message: _error!, onRetry: _loadPage);
-                  }
-                  return _ActivityTile(
-                    activity: _items[index],
-                    actorName: _names[_items[index].actorUserId] ?? 'Member',
-                    currency: widget.room.currency,
-                  );
-                },
-              ),
+    return AmbientBackground(
+      child: Scaffold(
+        appBar: AppBar(title: Text('${widget.room.name} activity')),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            setState(() {
+              _items.clear();
+              _hasMore = true;
+            });
+            await _loadPage();
+          },
+          child: _items.isEmpty && _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _items.isEmpty && _error != null
+              ? _ErrorView(message: _error!, onRetry: _loadPage)
+              : _items.isEmpty
+              ? const Center(child: Text('No activity yet.'))
+              : ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+                  itemCount: _items.length + (_loading || _hasMore ? 1 : 0),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (_, index) {
+                    if (index == _items.length) {
+                      return _error == null
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          : _ErrorView(message: _error!, onRetry: _loadPage);
+                    }
+                    return _ActivityTile(
+                      activity: _items[index],
+                      actorName: _names[_items[index].actorUserId] ?? 'Member',
+                      currency: widget.room.currency,
+                    );
+                  },
+                ),
+        ),
       ),
     );
   }

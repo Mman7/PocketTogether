@@ -23,6 +23,7 @@ import '../features/rooms/data/room_activity_repository.dart';
 import '../features/rooms/presentation/pages/rooms_page.dart';
 import '../features/statistics/data/expense_statistics_repository.dart';
 import '../features/statistics/data/firebase_expense_statistics_repository.dart';
+import '../shared/presentation/widgets/ambient_background.dart';
 import 'theme/app_theme.dart';
 
 class PocketTogetherApp extends StatefulWidget {
@@ -122,7 +123,8 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
         GoRoute(
           path: '/register',
-          builder: (context, state) => const RegisterPage(),
+          builder: (context, state) =>
+              AmbientBackground(child: const RegisterPage()),
         ),
         GoRoute(
           path: '/forgot-password',
@@ -130,14 +132,16 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         ),
         GoRoute(
           path: '/rooms',
-          builder: (context, state) => RoomsPage(
-            currentUser: _authRepository.currentUser,
-            profileRepository: _profileRepository,
-            roomRepository: _roomRepository,
-            expenseRepository: _expenseRepository,
-            activityRepository: _activityRepository,
-            statisticsRepository: _statisticsRepository,
-            onSignOut: () => context.read<AuthCubit>().signOut(),
+          builder: (context, state) => AmbientBackground(
+            child: RoomsPage(
+              currentUser: _authRepository.currentUser,
+              profileRepository: _profileRepository,
+              roomRepository: _roomRepository,
+              expenseRepository: _expenseRepository,
+              activityRepository: _activityRepository,
+              statisticsRepository: _statisticsRepository,
+              onSignOut: () => context.read<AuthCubit>().signOut(),
+            ),
           ),
         ),
       ],

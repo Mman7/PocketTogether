@@ -38,7 +38,7 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9FC),
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: AppColors.white,
         titleSpacing: 0,

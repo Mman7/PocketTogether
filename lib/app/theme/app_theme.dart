@@ -39,7 +39,7 @@ ThemeData buildAppTheme() {
       surface: AppColors.white,
       error: AppColors.danger,
     ),
-    scaffoldBackgroundColor: AppColors.canvas,
+    scaffoldBackgroundColor: Colors.transparent,
   );
 
   return base.copyWith(

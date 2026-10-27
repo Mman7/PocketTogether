@@ -49,8 +49,8 @@ class _StatisticsPageState extends State<StatisticsPage> {
               sliver: SliverList.list(
                 children: [
                   const PageHeader(
-                    title: 'Statistics',
-                    subtitle: 'A clearer picture of where it goes.',
+                    title: 'My statistics',
+                    subtitle: 'A clearer picture of your spending.',
                   ),
                   const SizedBox(height: 17),
                   if (state.isLoading && state.ledgers.isEmpty)
@@ -61,7 +61,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   else if (state.errorMessage != null)
                     EmptyPanel(
                       icon: Icons.error_outline_rounded,
-                      title: 'Statistics unavailable',
+                      title: 'Your statistics are unavailable',
                       message: state.errorMessage!,
                       compact: true,
                     )

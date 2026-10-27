@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/services.dart';
+import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/category_emoji.dart';
@@ -87,295 +88,304 @@ class _AddExpensePageState extends State<AddExpensePage> {
     if (!quickCategories.contains(_category)) {
       quickCategories.insert(0, _category);
     }
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close_rounded),
-          tooltip: 'Close',
-        ),
-        title: Text(
-          _editing ? 'Edit expense' : 'Add expense',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-        ),
-        actions: [
-          TextButton(
-            onPressed: amount > 0 ? _save : null,
-            child: const Text('Save'),
+    return AmbientBackground(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded),
+            tooltip: 'Close',
           ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(18, 5, 18, 14),
-                children: [
-                  _AmountCard(
-                    controller: _amountController,
-                    onAmountChanged: (value) => setState(() => _amount = value),
-                    currency: _currencySymbol(widget.room.currency ?? 'MYR'),
-                    roomName: widget.room.name,
-                    onQuickAdd: _addAmount,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Category',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: _chooseCategory,
-                        child: const Text('See all'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  SizedBox(
-                    height: 56,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
+          title: Text(
+            _editing ? 'Edit expense' : 'Add expense',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
+          actions: [
+            TextButton(
+              onPressed: amount > 0 ? _save : null,
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(18, 5, 18, 14),
+                  children: [
+                    _AmountCard(
+                      controller: _amountController,
+                      onAmountChanged: (value) =>
+                          setState(() => _amount = value),
+                      currency: _currencySymbol(widget.room.currency ?? 'MYR'),
+                      roomName: widget.room.name,
+                      onQuickAdd: _addAmount,
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
                       children: [
-                        for (final category in quickCategories)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _CategoryChip(
-                              name: category,
-                              icon: categoryIcon(category),
-                              selected: _category == category,
-                              onTap: () => _setCategory(category),
+                        const Expanded(
+                          child: Text(
+                            'Category',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        IconButton.filledTonal(
+                        ),
+                        TextButton(
                           onPressed: _chooseCategory,
-                          icon: const Icon(Icons.grid_view_rounded),
-                          tooltip: 'All categories',
+                          child: const Text('See all'),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  SurfaceCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _MetadataRow(
-                          icon: Icons.account_balance_wallet_outlined,
-                          label: 'Paid by',
-                          trailing: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value:
-                                  widget.members.any(
-                                    (member) => member.userId == _paidByUserId,
-                                  )
-                                  ? _paidByUserId
-                                  : null,
-                              borderRadius: BorderRadius.circular(14),
-                              items: [
-                                for (final member in widget.members)
-                                  DropdownMenuItem(
-                                    value: member.userId,
-                                    child: Text(
-                                      member.userId == widget.currentUserId
-                                          ? '${member.displayName} (You)'
-                                          : member.displayName,
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 56,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        children: [
+                          for (final category in quickCategories)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _CategoryChip(
+                                name: category,
+                                icon: categoryIcon(category),
+                                selected: _category == category,
+                                onTap: () => _setCategory(category),
+                              ),
+                            ),
+                          IconButton.filledTonal(
+                            onPressed: _chooseCategory,
+                            icon: const Icon(Icons.grid_view_rounded),
+                            tooltip: 'All categories',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SurfaceCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          _MetadataRow(
+                            icon: Icons.account_balance_wallet_outlined,
+                            label: 'Paid by',
+                            trailing: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value:
+                                    widget.members.any(
+                                      (member) =>
+                                          member.userId == _paidByUserId,
+                                    )
+                                    ? _paidByUserId
+                                    : null,
+                                borderRadius: BorderRadius.circular(14),
+                                items: [
+                                  for (final member in widget.members)
+                                    DropdownMenuItem(
+                                      value: member.userId,
+                                      child: Text(
+                                        member.userId == widget.currentUserId
+                                            ? '${member.displayName} (You)'
+                                            : member.displayName,
+                                      ),
                                     ),
-                                  ),
-                              ],
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _paidByUserId = value;
-                                  final recipients = _transferRecipients(value);
-                                  if (!recipients.contains(_transferToUserId) &&
-                                      recipients.isNotEmpty) {
-                                    _transferToUserId = recipients.first;
-                                  }
-                                });
-                              },
+                                ],
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() {
+                                    _paidByUserId = value;
+                                    final recipients = _transferRecipients(
+                                      value,
+                                    );
+                                    if (!recipients.contains(
+                                          _transferToUserId,
+                                        ) &&
+                                        recipients.isNotEmpty) {
+                                      _transferToUserId = recipients.first;
+                                    }
+                                  });
+                                },
+                              ),
                             ),
                           ),
-                        ),
-                        const Divider(height: 1, color: AppColors.paleBlue),
-                        if (_isTransfer) ...[
+                          const Divider(height: 1, color: AppColors.paleBlue),
+                          if (_isTransfer) ...[
+                            _MetadataRow(
+                              icon: Icons.swap_horiz_rounded,
+                              label: 'Transfer method',
+                              trailing: SizedBox(
+                                width: 150,
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: _transferMethod,
+                                    isExpanded: true,
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    borderRadius: BorderRadius.circular(14),
+                                    items: [
+                                      for (final method in [
+                                        'Bank transfer',
+                                        'Cash',
+                                        'E-wallet',
+                                      ])
+                                        DropdownMenuItem(
+                                          value: method,
+                                          child: Text(method),
+                                        ),
+                                    ],
+                                    onChanged: (value) => setState(
+                                      () => _transferMethod =
+                                          value ?? _transferMethod,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1, color: AppColors.paleBlue),
+                            _MetadataRow(
+                              icon: Icons.person_outline_rounded,
+                              label: 'Transfer to',
+                              trailing: SizedBox(
+                                width: 150,
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value:
+                                        _transferRecipients(_paidByUserId)
+                                            .contains(_transferToUserId)
+                                        ? _transferToUserId
+                                        : null,
+                                    isExpanded: true,
+                                    alignment: AlignmentDirectional.centerEnd,
+                                    borderRadius: BorderRadius.circular(14),
+                                    items: [
+                                      for (final member in _transferRecipients(
+                                        _paidByUserId,
+                                      ))
+                                        DropdownMenuItem(
+                                          value: member,
+                                          child: Text(_memberName(member)),
+                                        ),
+                                    ],
+                                    onChanged: (value) => setState(
+                                      () => _transferToUserId =
+                                          value ?? _transferToUserId,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(13, 12, 13, 4),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.call_split_rounded,
+                                    size: 19,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      'Split with',
+                                      style: TextStyle(
+                                        color: AppColors.muted,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    '${_selectedSplitIds.length} selected',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            for (final member in widget.members)
+                              CheckboxListTile(
+                                dense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                ),
+                                title: Text(
+                                  member.userId == widget.currentUserId
+                                      ? '${member.displayName} (You)'
+                                      : member.displayName,
+                                ),
+                                value: _selectedSplitIds.contains(
+                                  member.userId,
+                                ),
+                                onChanged: (selected) => setState(() {
+                                  if (selected == true) {
+                                    _splitMemberIds.add(member.userId);
+                                  } else {
+                                    _splitMemberIds.remove(member.userId);
+                                  }
+                                }),
+                              ),
+                          ],
+                          const Divider(height: 1, color: AppColors.paleBlue),
                           _MetadataRow(
-                            icon: Icons.swap_horiz_rounded,
-                            label: 'Transfer method',
+                            icon: Icons.edit_note_rounded,
+                            label: 'Note',
                             trailing: SizedBox(
                               width: 150,
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: _transferMethod,
-                                  isExpanded: true,
-                                  alignment: AlignmentDirectional.centerEnd,
-                                  borderRadius: BorderRadius.circular(14),
-                                  items: [
-                                    for (final method in [
-                                      'Bank transfer',
-                                      'Cash',
-                                      'E-wallet',
-                                    ])
-                                      DropdownMenuItem(
-                                        value: method,
-                                        child: Text(method),
-                                      ),
-                                  ],
-                                  onChanged: (value) => setState(
-                                    () => _transferMethod =
-                                        value ?? _transferMethod,
-                                  ),
+                              child: TextField(
+                                controller: _note,
+                                textAlign: TextAlign.end,
+                                decoration: const InputDecoration(
+                                  hintText: 'Add a note',
+                                  border: InputBorder.none,
+                                  filled: false,
+                                  // contentPadding: EdgeInsets.zero,
                                 ),
                               ),
                             ),
                           ),
                           const Divider(height: 1, color: AppColors.paleBlue),
                           _MetadataRow(
-                            icon: Icons.person_outline_rounded,
-                            label: 'Transfer to',
-                            trailing: SizedBox(
-                              width: 150,
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value:
-                                      _transferRecipients(_paidByUserId)
-                                          .contains(_transferToUserId)
-                                      ? _transferToUserId
-                                      : null,
-                                  isExpanded: true,
-                                  alignment: AlignmentDirectional.centerEnd,
-                                  borderRadius: BorderRadius.circular(14),
-                                  items: [
-                                    for (final member in _transferRecipients(
-                                      _paidByUserId,
-                                    ))
-                                      DropdownMenuItem(
-                                        value: member,
-                                        child: Text(_memberName(member)),
-                                      ),
-                                  ],
-                                  onChanged: (value) => setState(
-                                    () => _transferToUserId =
-                                        value ?? _transferToUserId,
-                                  ),
-                                ),
+                            icon: Icons.calendar_today_outlined,
+                            label: 'Date',
+                            trailing: TextButton.icon(
+                              onPressed: _chooseDate,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                size: 17,
                               ),
+                              label: Text(_dateLabel),
                             ),
                           ),
-                        ] else ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(13, 12, 13, 4),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.call_split_rounded,
-                                  size: 19,
-                                  color: AppColors.primary,
-                                ),
-                                const SizedBox(width: 10),
-                                const Expanded(
-                                  child: Text(
-                                    'Split with',
-                                    style: TextStyle(
-                                      color: AppColors.muted,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  '${_selectedSplitIds.length} selected',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          for (final member in widget.members)
-                            CheckboxListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 13,
-                              ),
-                              title: Text(
-                                member.userId == widget.currentUserId
-                                    ? '${member.displayName} (You)'
-                                    : member.displayName,
-                              ),
-                              value: _selectedSplitIds.contains(member.userId),
-                              onChanged: (selected) => setState(() {
-                                if (selected == true) {
-                                  _splitMemberIds.add(member.userId);
-                                } else {
-                                  _splitMemberIds.remove(member.userId);
-                                }
-                              }),
-                            ),
                         ],
-                        const Divider(height: 1, color: AppColors.paleBlue),
-                        _MetadataRow(
-                          icon: Icons.edit_note_rounded,
-                          label: 'Note',
-                          trailing: SizedBox(
-                            width: 150,
-                            child: TextField(
-                              controller: _note,
-                              textAlign: TextAlign.end,
-                              decoration: const InputDecoration(
-                                hintText: 'Add a note',
-                                border: InputBorder.none,
-                                filled: false,
-                                // contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 1, color: AppColors.paleBlue),
-                        _MetadataRow(
-                          icon: Icons.calendar_today_outlined,
-                          label: 'Date',
-                          trailing: TextButton.icon(
-                            onPressed: _chooseDate,
-                            icon: const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 17,
-                            ),
-                            label: Text(_dateLabel),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-              decoration: const BoxDecoration(
-                color: AppColors.white,
-                border: Border(top: BorderSide(color: AppColors.border)),
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: PrimaryButton(
+                  label: expenseState.isMutating
+                      ? 'Saving…'
+                      : '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency ?? 'MYR')}${_amount.isEmpty ? '0' : _amount}',
+                  icon: expenseState.isMutating
+                      ? Icons.hourglass_top_rounded
+                      : Icons.add_task_rounded,
+                  onPressed: amount > 0 && !expenseState.isMutating
+                      ? _save
+                      : null,
+                ),
               ),
-              child: PrimaryButton(
-                label: expenseState.isMutating
-                    ? 'Saving…'
-                    : '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency ?? 'MYR')}${_amount.isEmpty ? '0' : _amount}',
-                icon: expenseState.isMutating
-                    ? Icons.hourglass_top_rounded
-                    : Icons.add_task_rounded,
-                onPressed: amount > 0 && !expenseState.isMutating
-                    ? _save
-                    : null,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

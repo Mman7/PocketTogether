@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pocket_together/features/profile/presentation/cubit/profile_state.dart';
+import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/money_format.dart';
@@ -330,7 +331,12 @@ class _RoomsPageState extends State<RoomsPage> {
     ];
     return NavigationBar(
       selectedIndex: _selectedTab,
-      onDestinationSelected: (index) => setState(() => _selectedTab = index),
+      onDestinationSelected: (index) {
+        if (index == 1 || index == 2) {
+          _ledgerCubit.refresh();
+        }
+        setState(() => _selectedTab = index);
+      },
       backgroundColor: AppColors.white,
       indicatorColor: AppColors.paleBlue,
       height: 68,
@@ -511,14 +517,16 @@ class _RoomPreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RoomDashboardPage(
-      room: room,
-      currentUserId: userId,
-      currentUserDisplayName: displayName,
-      roomRepository: roomRepository,
-      expenseRepository: expenseRepository,
-      activityRepository: activityRepository,
-      onDeleted: onDeleted,
+    return AmbientBackground(
+      child: RoomDashboardPage(
+        room: room,
+        currentUserId: userId,
+        currentUserDisplayName: displayName,
+        roomRepository: roomRepository,
+        expenseRepository: expenseRepository,
+        activityRepository: activityRepository,
+        onDeleted: onDeleted,
+      ),
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/money_format.dart';
@@ -236,9 +237,9 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
             children: [
               for (final action in const [
                 _QuickAction('Members', Icons.groups_outlined),
-                _QuickAction('Settle', Icons.call_split_rounded),
                 _QuickAction('Stats', Icons.bar_chart_rounded),
                 _QuickAction('History', Icons.bar_chart_rounded),
+                _QuickAction('Activity', Icons.bar_chart_rounded),
               ])
                 Expanded(
                   child: Padding(
@@ -666,8 +667,12 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     if (!mounted) return;
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            RoomMembersPage(roomName: widget.room.name, members: latestMembers),
+        builder: (_) => AmbientBackground(
+          child: RoomMembersPage(
+            roomName: widget.room.name,
+            members: latestMembers,
+          ),
+        ),
       ),
     );
   }
@@ -881,11 +886,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
         MaterialPageRoute<void>(
           builder: (_) => BlocProvider.value(
             value: _expenseCubit,
-            child: RoomExpenseHistoryPage(
-              room: widget.room,
-              members: members,
-              currentUserId: widget.currentUserId,
-              currentUserDisplayName: widget.currentUserDisplayName,
+            child: AmbientBackground(
+              child: RoomExpenseHistoryPage(
+                room: widget.room,
+                members: members,
+                currentUserId: widget.currentUserId,
+                currentUserDisplayName: widget.currentUserDisplayName,
+              ),
             ),
           ),
         ),

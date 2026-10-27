@@ -504,14 +504,12 @@ class AuthFrame extends StatelessWidget {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
+                              color: AppColors.white,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             alignment: Alignment.center,
-                            child: const Icon(
-                              Icons.account_balance_wallet_rounded,
-                              color: AppColors.white,
-                              size: 22,
+                            child: const Image(
+                              image: AssetImage('assets/icon/logo.png'),
                             ),
                           ),
                           const SizedBox(width: 10),
