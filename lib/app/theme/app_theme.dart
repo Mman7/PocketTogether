@@ -12,12 +12,7 @@ abstract final class AppColors {
   static const border = Color(0xFFE2E4F0);
   static const paleBlue = Color(0xFFEEF1FF);
   static const paleCyan = Color(0xFFE4F8FD);
-  static const expenseMine = Color.from(
-    alpha: 0.3,
-    red: 0.847,
-    green: 0.788,
-    blue: 0.98,
-  );
+  static const expenseMine = Color(0xFFF0E9FF);
   static const expenseMineBadge = Color(0xFFD8C9FA);
   static const danger = Color(0xFFBE3434);
   static const success = Color(0xFF16835D);

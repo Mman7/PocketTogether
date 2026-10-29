@@ -125,7 +125,11 @@ class RoomCubit extends Cubit<RoomState> {
     try {
       final result = await _repository.joinRoom(inviteCode: inviteCode);
       if (isClosed) return null;
-      emit(state.copyWith(isJoining: false, joinedRoom: result));
+      final rooms = [
+        result.room,
+        ...state.rooms.where((room) => room.id != result.room.id),
+      ];
+      emit(state.copyWith(isJoining: false, rooms: rooms, joinedRoom: result));
       return result;
     } on RoomFailure catch (error) {
       if (!isClosed) {

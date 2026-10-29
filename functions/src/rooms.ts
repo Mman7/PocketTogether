@@ -156,6 +156,11 @@ export async function createRoomHandler(
           role: 'owner',
           joinedAt: now,
         });
+        transaction.create(roomRef.collection('activityLogs').doc(), {
+          type: 'room_created',
+          actorUserId: uid,
+          createdAt: now,
+        });
         transaction.create(inviteRef, {
           roomId: roomRef.id,
           createdBy: uid,

@@ -153,6 +153,7 @@ class _ActivityTile extends StatelessWidget {
     final metadata = activity.metadata;
     final amount = metadata['amountInCents'];
     final title = switch (activity.type) {
+      'room_created' => 'created the room',
       'expense_created' => 'added an expense',
       'expense_updated' => 'updated an expense',
       'expense_deleted' => 'deleted an expense',

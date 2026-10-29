@@ -120,15 +120,21 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         return null;
       },
       routes: [
-        GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) =>
+              AmbientBackground(child: const LoginPage()),
+        ),
         GoRoute(
           path: '/register',
-          builder: (context, state) =>
-              AmbientBackground(child: const RegisterPage()),
+          builder: (context, state) => AmbientBackground(
+            child: AmbientBackground(child: const RegisterPage()),
+          ),
         ),
         GoRoute(
           path: '/forgot-password',
-          builder: (context, state) => const ForgotPasswordPage(),
+          builder: (context, state) =>
+              AmbientBackground(child: const ForgotPasswordPage()),
         ),
         GoRoute(
           path: '/rooms',

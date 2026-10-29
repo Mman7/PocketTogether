@@ -384,11 +384,17 @@ class _RoomsPageState extends State<RoomsPage> {
     final Widget page = isCreate
         ? BlocProvider<RoomCubit>.value(
             value: _roomCubit,
-            child: const CreateRoomPage(),
+            child: AmbientBackground(child: const CreateRoomPage()),
           )
         : BlocProvider<RoomCubit>.value(
             value: _roomCubit,
-            child: JoinRoomPage(onJoined: (room) => _openRoom(room)),
+            child: AmbientBackground(
+              child: JoinRoomPage(
+                onJoined: (room) {
+                  _openRoom(room);
+                },
+              ),
+            ),
           );
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => page));
   }
