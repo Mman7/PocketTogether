@@ -89,9 +89,8 @@ class _JoinRoomPageState extends State<JoinRoomPage> {
             const SizedBox(height: 22),
             PrimaryButton(
               label: _loading ? 'Joining room…' : 'Join room',
-              icon: _loading
-                  ? Icons.hourglass_top_rounded
-                  : Icons.login_rounded,
+              icon: Icons.login_rounded,
+              loading: _loading,
               onPressed: _loading ? null : _join,
             ),
             const SizedBox(height: 10),

@@ -282,6 +282,7 @@ class _EmptyRoomActivityRepository implements RoomActivityRepository {
   Future<RoomActivityPage> getPage({
     required String roomId,
     RoomActivity? after,
+    RoomActivityFilter filter = RoomActivityFilter.all,
     int limit = 20,
   }) async {
     return const RoomActivityPage(items: [], hasMore: false);

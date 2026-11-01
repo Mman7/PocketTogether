@@ -110,7 +110,7 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
                   .toSet()
                   .toList()
                 ..sort((first, second) => second.compareTo(first));
-          final selectedMonthKey = _selectedMonthKey ?? monthKeys.first;
+          final selectedMonthKey = _selectedMonthKey;
           final categories = <String>{
             'All',
             ...state.expenses
@@ -119,7 +119,9 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
           }.toList();
           final selectedExpenses = state.expenses
               .where(
-                (expense) => _monthKey(expense.expenseDate) == selectedMonthKey,
+                (expense) =>
+                    selectedMonthKey == null ||
+                    _monthKey(expense.expenseDate) == selectedMonthKey,
               )
               .where((expense) => expense.category != 'Transfer')
               .toList();
@@ -131,17 +133,10 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
               )
               .toList();
           final groupedExpenses = <String, List<Expense>>{};
-          final today = DateTime.now();
           for (final expense in state.expenses) {
             if (!filteredExpenses.contains(expense)) continue;
             final date = expense.expenseDate;
-            final day = DateTime(date.year, date.month, date.day);
-            final currentDay = DateTime(today.year, today.month, today.day);
-            final label = day == currentDay
-                ? 'Today'
-                : day == currentDay.subtract(const Duration(days: 1))
-                ? 'Yesterday'
-                : _formatDate(date);
+            final label = _formatMonth(_monthKey(date));
             groupedExpenses.putIfAbsent(label, () => []).add(expense);
           }
           for (final expenses in groupedExpenses.values) {
@@ -164,7 +159,9 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
               _RoomLedgerSummary(
                 totalInCents: groupTotal,
                 currency: widget.room.currency,
-                monthLabel: _formatMonth(selectedMonthKey),
+                monthLabel: selectedMonthKey == null
+                    ? 'All months'
+                    : _formatMonth(selectedMonthKey),
                 transactionCount: filteredExpenses.length,
               ),
               const SizedBox(height: 24),
@@ -208,6 +205,46 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
                   },
                 ),
               ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_month_outlined,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 7),
+                  PopupMenuButton<int>(
+                    tooltip: 'Choose month',
+                    onSelected: (value) => setState(
+                      () => _selectedMonthKey = value == -1 ? null : value,
+                    ),
+                    itemBuilder: (_) => [
+                      const PopupMenuItem(value: -1, child: Text('All months')),
+                      for (final monthKey in monthKeys)
+                        PopupMenuItem(
+                          value: monthKey,
+                          child: Text(_formatMonth(monthKey)),
+                        ),
+                    ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          selectedMonthKey == null
+                              ? 'All months'
+                              : _formatMonth(selectedMonthKey),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               if (filteredExpenses.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 36),
@@ -222,15 +259,11 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
                 for (final entry in groupedExpenses.entries) ...[
                   _RoomExpenseDateHeading(
                     label: entry.key,
-                    monthLabel: _formatMonth(selectedMonthKey),
                     total: entry.value.fold<int>(
                       0,
                       (sum, expense) => sum + expense.amountInCents,
                     ),
                     currency: widget.room.currency,
-                    onMonthSelected: entry.key == groupedExpenses.keys.first
-                        ? () => _selectMonth(monthKeys)
-                        : null,
                   ),
                   for (final expense in entry.value) ...[
                     RoomExpenseTile(
@@ -278,15 +311,6 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
 
   int _monthKey(DateTime date) => date.year * 100 + date.month;
 
-  Future<void> _selectMonth(List<int> availableMonthKeys) async {
-    final selectedMonthKey = await showDialog<int>(
-      context: context,
-      builder: (_) => _MonthPickerDialog(monthKeys: availableMonthKeys),
-    );
-    if (!mounted || selectedMonthKey == null) return;
-    setState(() => _selectedMonthKey = selectedMonthKey);
-  }
-
   String _formatMonth(int monthKey) {
     const monthNames = [
       'January',
@@ -306,9 +330,6 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
     final month = monthKey % 100;
     return '${monthNames[month - 1]} $year';
   }
-
-  String _formatDate(DateTime date) =>
-      '${date.day} ${_formatMonth(_monthKey(date)).split(' ').first}';
 }
 
 class _RoomLedgerSummary extends StatelessWidget {
@@ -473,17 +494,13 @@ String _formatCurrencyWithDecimals(int amountInCents, {String? currency}) {
 class _RoomExpenseDateHeading extends StatelessWidget {
   const _RoomExpenseDateHeading({
     required this.label,
-    required this.monthLabel,
     required this.total,
     required this.currency,
-    this.onMonthSelected,
   });
 
   final String label;
-  final String monthLabel;
   final int total;
   final String? currency;
-  final VoidCallback? onMonthSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -495,74 +512,11 @@ class _RoomExpenseDateHeading extends StatelessWidget {
             label.toUpperCase(),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
           ),
-          if (onMonthSelected != null)
-            Row(
-              children: [
-                StatusPill(label: monthLabel),
-                IconButton(
-                  icon: const Icon(Icons.calendar_month_rounded, size: 16),
-                  tooltip: 'Choose month',
-                  onPressed: onMonthSelected,
-                ),
-              ],
-            ),
           const Spacer(),
           StatusPill(label: formatCurrency(total, currency: currency)),
         ],
       ),
     );
-  }
-}
-
-class _MonthPickerDialog extends StatelessWidget {
-  const _MonthPickerDialog({required this.monthKeys});
-
-  final List<int> monthKeys;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Choose month'),
-      content: SizedBox(
-        width: 320,
-        child: GridView.builder(
-          shrinkWrap: true,
-          itemCount: monthKeys.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.8,
-          ),
-          itemBuilder: (context, index) {
-            final monthKey = monthKeys[index];
-            return OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(monthKey),
-              child: Text(_formatMonth(monthKey), textAlign: TextAlign.center),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  String _formatMonth(int monthKey) {
-    const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
-    ];
-    final month = monthKey % 100;
-    return '${monthNames[month - 1].substring(0, 3)} ${monthKey ~/ 100}';
   }
 }
 

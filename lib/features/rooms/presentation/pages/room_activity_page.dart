@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:timelines_plus/timelines_plus.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/money_format.dart';
+import '../../../../shared/presentation/widgets/ambient_background.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../data/room_activity_repository.dart';
 import '../../models/room.dart';
 import '../../models/room_activity.dart';
 import '../../models/room_member.dart';
+import '../cubit/room_activity_cubit.dart';
+import '../cubit/room_activity_state.dart';
 
 class RoomActivityPage extends StatefulWidget {
   const RoomActivityPage({
@@ -27,10 +31,7 @@ class RoomActivityPage extends StatefulWidget {
 
 class _RoomActivityPageState extends State<RoomActivityPage> {
   final _scrollController = ScrollController();
-  final _items = <RoomActivity>[];
-  bool _loading = false;
-  bool _hasMore = true;
-  String? _error;
+  late final RoomActivityCubit _cubit;
 
   Map<String, String> get _names => {
     for (final member in widget.members) member.userId: member.displayName,
@@ -39,8 +40,8 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
   @override
   void initState() {
     super.initState();
+    _cubit = RoomActivityCubit(widget.repository)..load(widget.room.id);
     _scrollController.addListener(_loadWhenNearEnd);
-    _loadPage();
   }
 
   @override
@@ -48,159 +49,352 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
     _scrollController
       ..removeListener(_loadWhenNearEnd)
       ..dispose();
+    _cubit.close();
     super.dispose();
   }
 
-  Future<void> _loadPage() async {
-    if (_loading || !_hasMore) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final page = await widget.repository.getPage(
-        roomId: widget.room.id,
-        after: _items.isEmpty ? null : _items.last,
-      );
-      if (!mounted) return;
-      setState(() {
-        _items.addAll(page.items);
-        _hasMore = page.hasMore;
-        _loading = false;
-      });
-    } on RoomActivityFailure catch (error) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = error.message;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = 'Unable to load room activity.';
-        });
-      }
-    }
-  }
-
   void _loadWhenNearEnd() {
-    if (_scrollController.position.extentAfter < 320) _loadPage();
+    if (_scrollController.hasClients &&
+        _scrollController.position.extentAfter < 320) {
+      _cubit.loadMore();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AmbientBackground(
-      child: Scaffold(
-        appBar: AppBar(title: Text('${widget.room.name} activity')),
-        body: RefreshIndicator(
-          onRefresh: () async {
-            setState(() {
-              _items.clear();
-              _hasMore = true;
-            });
-            await _loadPage();
-          },
-          child: _items.isEmpty && _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _items.isEmpty && _error != null
-              ? _ErrorView(message: _error!, onRetry: _loadPage)
-              : _items.isEmpty
-              ? const Center(child: Text('No activity yet.'))
-              : ListView.separated(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-                  itemCount: _items.length + (_loading || _hasMore ? 1 : 0),
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, index) {
-                    if (index == _items.length) {
-                      return _error == null
-                          ? const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(12),
-                                child: CircularProgressIndicator(),
-                              ),
-                            )
-                          : _ErrorView(message: _error!, onRetry: _loadPage);
-                    }
-                    return _ActivityTile(
-                      activity: _items[index],
-                      actorName: _names[_items[index].actorUserId] ?? 'Member',
-                      currency: widget.room.currency,
-                    );
-                  },
+    return BlocProvider.value(
+      value: _cubit,
+      child: AmbientBackground(
+        child: Scaffold(
+          appBar: AppBar(title: const Text('Activity')),
+          body: BlocBuilder<RoomActivityCubit, RoomActivityState>(
+            builder: (context, state) => Column(
+              children: [
+                _FilterBar(
+                  selected: state.filter,
+                  onSelected: context.read<RoomActivityCubit>().changeFilter,
                 ),
+                Expanded(child: _buildContent(context, state)),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
+  Widget _buildContent(BuildContext context, RoomActivityState state) {
+    final cubit = context.read<RoomActivityCubit>();
+    if (state.isLoading && state.items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (state.items.isEmpty && state.errorMessage != null) {
+      return _ErrorView(message: state.errorMessage!, onRetry: cubit.refresh);
+    }
+    if (state.items.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(18, 8, 18, 28),
+        child: SizedBox(
+          width: double.infinity,
+          child: EmptyState(
+            icon: Icons.timeline_outlined,
+            title: 'No activity yet',
+            message: 'Room updates will appear here.',
+          ),
+        ),
+      );
+    }
+
+    final hasFooter =
+        state.isLoadingMore || state.hasMore || state.errorMessage != null;
+    return RefreshIndicator(
+      onRefresh: cubit.refresh,
+      child: Timeline.tileBuilder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+        builder: TimelineTileBuilder(
+          itemCount: state.items.length + (hasFooter ? 1 : 0),
+          contentsBuilder: (_, index) {
+            if (index == state.items.length) {
+              return _TimelineFooter(
+                isLoading: state.isLoadingMore,
+                errorMessage: state.errorMessage,
+                hasMore: state.hasMore,
+                onRetry: cubit.loadMore,
+              );
+            }
+            final activity = state.items[index];
+            final showDate =
+                index == 0 ||
+                !_sameDate(
+                  activity.createdAt,
+                  state.items[index - 1].createdAt,
+                );
+            return _ActivityContent(
+              activity: activity,
+              actorName: _actorName(activity),
+              currency: widget.room.currency,
+              showDate: showDate,
+            );
+          },
+          indicatorBuilder: (_, index) => index >= state.items.length
+              ? Indicator.transparent()
+              : Indicator.dot(size: 12, color: _eventColor(state.items[index])),
+          startConnectorBuilder: (_, index) => index == 0
+              ? const TransparentConnector()
+              : const SolidLineConnector(
+                  color: AppColors.border,
+                  thickness: 1.4,
+                ),
+          endConnectorBuilder: (_, index) => index >= state.items.length - 1
+              ? const TransparentConnector()
+              : const SolidLineConnector(
+                  color: AppColors.border,
+                  thickness: 1.4,
+                ),
+          nodePositionBuilder: (_, _) => 0.06,
+        ),
+      ),
+    );
+  }
+
+  String _actorName(RoomActivity activity) {
+    if (activity.isMember && activity.memberUserId != null) {
+      return _names[activity.memberUserId!] ??
+          activity.memberDisplayName ??
+          _names[activity.actorUserId] ??
+          'Member';
+    }
+    return _names[activity.actorUserId] ?? 'Member';
+  }
+
+  Color _eventColor(RoomActivity activity) {
+    if (activity.isMember) return AppColors.secondary;
+    if (activity.isExpense) return AppColors.primary;
+    return AppColors.muted;
+  }
+
+  bool _sameDate(DateTime? first, DateTime? second) {
+    if (first == null || second == null) return first == second;
+    final firstLocal = first.toLocal();
+    final secondLocal = second.toLocal();
+    return firstLocal.year == secondLocal.year &&
+        firstLocal.month == secondLocal.month &&
+        firstLocal.day == secondLocal.day;
+  }
 }
 
-class _ActivityTile extends StatelessWidget {
-  const _ActivityTile({
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({required this.selected, required this.onSelected});
+
+  final RoomActivityFilter selected;
+  final ValueChanged<RoomActivityFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 54,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final filter in RoomActivityFilter.values)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(_label(filter)),
+                selected: selected == filter,
+                showCheckmark: false,
+                onSelected: (_) => onSelected(filter),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _label(RoomActivityFilter filter) => switch (filter) {
+    RoomActivityFilter.all => 'All',
+    RoomActivityFilter.expenses => 'Expenses',
+    RoomActivityFilter.members => 'Members',
+  };
+}
+
+class _ActivityContent extends StatelessWidget {
+  const _ActivityContent({
     required this.activity,
     required this.actorName,
     required this.currency,
+    required this.showDate,
   });
 
   final RoomActivity activity;
   final String actorName;
   final String? currency;
+  final bool showDate;
 
   @override
   Widget build(BuildContext context) {
-    final metadata = activity.metadata;
-    final amount = metadata['amountInCents'];
-    final title = switch (activity.type) {
-      'room_created' => 'created the room',
-      'expense_created' => 'added an expense',
-      'expense_updated' => 'updated an expense',
-      'expense_deleted' => 'deleted an expense',
-      'member_joined' => 'joined the room',
-      'member_left' => 'removed a member',
-      _ => 'changed the room',
-    };
-    final note = metadata['note'] as String?;
-    final amountText = amount is num
-        ? ' - ${formatCurrency(amount.toInt(), currency: currency)}'
-        : '';
-    return SurfaceCard(
-      padding: const EdgeInsets.all(14),
-      child: Row(
+    final details = _details();
+    return Padding(
+      padding: EdgeInsets.only(left: 14, right: 2, bottom: showDate ? 10 : 14),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.history_rounded, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$actorName $title$amountText',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                if (note?.trim().isNotEmpty == true) ...[
-                  const SizedBox(height: 3),
-                  Text(note!, style: const TextStyle(color: AppColors.muted)),
-                ],
-                const SizedBox(height: 5),
-                Text(
-                  _formatDate(activity.createdAt),
-                  style: const TextStyle(color: AppColors.muted, fontSize: 11),
-                ),
-              ],
+          if (showDate) ...[
+            Text(
+              _dateLabel(activity.createdAt),
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(_icon(), color: AppColors.primary, size: 19),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$actorName ${details.action}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (details.subject != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        details.subject!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppColors.muted),
+                      ),
+                    ],
+                    const SizedBox(height: 3),
+                    Text(
+                      '${details.amount ?? ''}${details.amount == null ? '' : ' · '}${_time(activity.createdAt)}',
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime? value) {
+  _ActivityDetails _details() {
+    final amountText = _amountText();
+    return switch (activity.type) {
+      'room_created' => const _ActivityDetails('created the room'),
+      'expense_created' => _ActivityDetails(
+        'added an expense',
+        subject: activity.expenseTitle,
+        amount: amountText,
+      ),
+      'expense_updated' => _ActivityDetails(
+        'updated an expense',
+        subject: activity.expenseTitle,
+        amount: amountText,
+      ),
+      'expense_deleted' => _ActivityDetails(
+        'deleted an expense',
+        subject: activity.expenseTitle,
+        amount: amountText,
+      ),
+      'member_joined' => _ActivityDetails(
+        'joined the room',
+        subject: activity.memberDisplayName,
+      ),
+      'member_left' || 'member_removed' => _ActivityDetails(
+        'removed a member',
+        subject: activity.memberDisplayName,
+      ),
+      _ => const _ActivityDetails('changed the room'),
+    };
+  }
+
+  String? _amountText() {
+    final amount = activity.amountInCents;
+    if (activity.type == 'expense_updated') {
+      final previousAmount = activity.previousAmountInCents;
+      final newAmount = activity.newAmountInCents;
+      if (previousAmount != null && newAmount != null) {
+        return '${formatCurrency(previousAmount, currency: currency)} -> '
+            '${formatCurrency(newAmount, currency: currency)}';
+      }
+    }
+    return amount == null ? null : formatCurrency(amount, currency: currency);
+  }
+
+  IconData _icon() {
+    if (activity.isMember) return Icons.person_add_alt_1_rounded;
+    if (activity.isExpense) return Icons.receipt_long_rounded;
+    return Icons.home_work_outlined;
+  }
+
+  String _dateLabel(DateTime? value) {
+    if (value == null) return 'Recent';
+    final local = value.toLocal();
+    final today = DateTime.now();
+    final date = DateTime(local.year, local.month, local.day);
+    final todayDate = DateTime(today.year, today.month, today.day);
+    if (date == todayDate) return 'Today';
+    if (date == todayDate.subtract(const Duration(days: 1))) return 'Yesterday';
+    return '${local.day}/${local.month}/${local.year}';
+  }
+
+  String _time(DateTime? value) {
     if (value == null) return 'Just now';
     final local = value.toLocal();
-    return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${local.hour >= 12 ? 'PM' : 'AM'}';
+  }
+}
+
+class _ActivityDetails {
+  const _ActivityDetails(this.action, {this.subject, this.amount});
+
+  final String action;
+  final String? subject;
+  final String? amount;
+}
+
+class _TimelineFooter extends StatelessWidget {
+  const _TimelineFooter({
+    required this.isLoading,
+    required this.errorMessage,
+    required this.hasMore,
+    required this.onRetry,
+  });
+
+  final bool isLoading;
+  final String? errorMessage;
+  final bool hasMore;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Padding(
+        padding: EdgeInsets.all(14),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (errorMessage != null) {
+      return _ErrorView(message: errorMessage!, onRetry: onRetry);
+    }
+    return hasMore ? const SizedBox(height: 20) : const SizedBox.shrink();
   }
 }
 

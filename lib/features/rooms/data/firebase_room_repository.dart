@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/room.dart';
 import '../models/room_invite.dart';
@@ -123,6 +124,7 @@ class FirebaseRoomRepository implements RoomRepository {
       await _functions.httpsCallable('removeRoomMember').call<void>({
         'roomId': roomId,
         'memberId': memberId,
+        'eventId': Uuid().v4(),
       });
     } on FirebaseFunctionsException catch (error) {
       throw _roomFailureFromFunction(error);
@@ -195,6 +197,7 @@ class FirebaseRoomRepository implements RoomRepository {
           .httpsCallable('joinRoom')
           .call<Map<String, dynamic>>({
             'inviteCode': inviteCode.trim().toUpperCase(),
+            'eventId': Uuid().v4(),
           });
       final data = result.data;
       final roomId = _requiredString(data, 'roomId');

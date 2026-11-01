@@ -40,10 +40,10 @@ export class ExpenseService {
       }
       this.expenses.create(transaction, expenseRef, this.withCreateTimestamps(input));
       this.applyContribution(transaction, roomRef, input, 1);
-      this.logActivity(transaction, roomRef, 'expense_created', uid, input.expenseId, {
+      this.logActivity(transaction, roomRef, 'expense_created', uid, input.expenseId, `create_${input.expenseId}`, {
+        expenseTitle: input.note ?? input.category,
         amountInCents: input.amountInCents,
         category: input.category,
-        note: input.note ?? null,
       });
     });
     await this.notifyExpense(
@@ -66,6 +66,7 @@ export class ExpenseService {
         throw new HttpsError('invalid-argument', 'The original expense creator cannot change.');
       }
       await this.assertRoomMember(transaction, roomRef, uid, input);
+      if (sameExpense(previous, input)) return;
       const update: Record<string, unknown> = {
         ...input,
         updatedAt: FieldValue.serverTimestamp(),
@@ -74,12 +75,27 @@ export class ExpenseService {
       this.expenses.update(transaction, expenseRef, update);
       this.applyContribution(transaction, roomRef, previous, -1);
       this.applyContribution(transaction, roomRef, input, 1);
-      this.logActivity(transaction, roomRef, 'expense_updated', uid, input.expenseId, {
-        previousAmountInCents: previous.amountInCents,
-        amountInCents: input.amountInCents,
+      const metadata: Record<string, unknown> = {
+        expenseTitle: input.note ?? input.category,
         category: input.category,
-        note: input.note ?? null,
-      });
+      };
+      if (previous.amountInCents !== input.amountInCents) {
+        metadata['previousAmountInCents'] = previous.amountInCents;
+        metadata['newAmountInCents'] = input.amountInCents;
+      }
+      if (previous.note !== input.note) {
+        metadata['previousExpenseTitle'] = previous.note ?? previous.category;
+        metadata['newExpenseTitle'] = input.note ?? input.category;
+      }
+      this.logActivity(
+        transaction,
+        roomRef,
+        'expense_updated',
+        uid,
+        input.expenseId,
+        `update_${this.updateEventKey(input)}`,
+        metadata,
+      );
     });
     await this.notifyExpense(
       input,
@@ -100,10 +116,10 @@ export class ExpenseService {
       await this.assertRoomMember(transaction, roomRef, uid, previous);
       this.expenses.delete(transaction, expenseRef);
       this.applyContribution(transaction, roomRef, previous, -1);
-      this.logActivity(transaction, roomRef, 'expense_deleted', uid, expenseId, {
+      this.logActivity(transaction, roomRef, 'expense_deleted', uid, expenseId, `delete_${expenseId}`, {
+        expenseTitle: previous.note ?? previous.category,
         amountInCents: previous.amountInCents,
         category: previous.category,
-        note: previous.note ?? null,
       });
     });
     return { expenseId };
@@ -155,12 +171,17 @@ export class ExpenseService {
     type: 'expense_created' | 'expense_updated' | 'expense_deleted',
     actorUserId: string,
     expenseId: string,
+    eventId: string,
     metadata: Record<string, unknown>,
   ): void {
-    const activityRef = roomRef.collection('activityLogs').doc();
+    const activityRef = roomRef
+      .collection('activityLogs')
+      .doc(`${type}_${expenseId}_${eventId}`);
     transaction.create(activityRef, {
       type,
       actorUserId,
+      targetType: 'expense',
+      targetId: expenseId,
       expenseId,
       createdAt: FieldValue.serverTimestamp(),
       metadata,

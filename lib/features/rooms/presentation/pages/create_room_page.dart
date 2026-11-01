@@ -141,9 +141,8 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                 const SizedBox(height: 24),
                 PrimaryButton(
                   label: state.isLoading ? 'Creating room…' : 'Create room',
-                  icon: state.isLoading
-                      ? Icons.hourglass_top_rounded
-                      : Icons.add_rounded,
+                  icon: Icons.add_rounded,
+                  loading: state.isLoading,
                   onPressed: state.isLoading ? null : () => _submit(context),
                 ),
               ],

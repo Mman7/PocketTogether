@@ -31,6 +31,7 @@ interface DeleteRoomData {
 interface RemoveRoomMemberData {
   roomId?: unknown;
   memberId?: unknown;
+  eventId?: unknown;
 }
 
 interface GetRoomMembersData {
@@ -43,6 +44,7 @@ interface CreateRoomInviteData {
 
 interface JoinRoomData {
   inviteCode?: unknown;
+  eventId?: unknown;
 }
 
 interface Profile {
@@ -157,10 +159,13 @@ export async function createRoomHandler(
           role: 'owner',
           joinedAt: now,
         });
-        transaction.create(roomRef.collection('activityLogs').doc(), {
+        transaction.create(roomRef.collection('activityLogs').doc(`room_created_${roomRef.id}`), {
           type: 'room_created',
           actorUserId: uid,
+          targetType: 'room',
+          targetId: roomRef.id,
           createdAt: now,
+          metadata: { roomName: name },
         });
         transaction.create(inviteRef, {
           roomId: roomRef.id,
@@ -282,6 +287,7 @@ export async function removeRoomMemberHandler(
   const data = asRecord(request.data);
   const roomId = typeof data['roomId'] === 'string' ? data['roomId'].trim() : '';
   const memberId = typeof data['memberId'] === 'string' ? data['memberId'].trim() : '';
+  const eventId = typeof data['eventId'] === 'string' ? data['eventId'].trim() : '';
   if (roomId.length === 0 || memberId.length === 0) {
     throw new HttpsError('invalid-argument', 'A room and member are required.');
   }
@@ -309,12 +315,24 @@ export async function removeRoomMemberHandler(
       memberIds: FieldValue.arrayRemove(memberId),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    transaction.create(roomRef.collection('activityLogs').doc(), {
-      type: 'member_left',
+    transaction.create(
+      roomRef.collection('activityLogs').doc(`member_removed_${eventId || memberId}`),
+      {
+      type: 'member_removed',
       actorUserId: uid,
+      targetType: 'member',
+      targetId: memberId,
       memberUserId: memberId,
       createdAt: FieldValue.serverTimestamp(),
-    });
+      metadata: {
+        memberUserId: memberId,
+        memberDisplayName:
+          typeof memberSnapshot.get('displayName') === 'string'
+              ? memberSnapshot.get('displayName')
+              : memberId,
+      },
+      },
+    );
   });
 
   return { roomId, memberId };
@@ -376,7 +394,11 @@ export async function joinRoomHandler(
   db: Firestore = firestore,
 ): Promise<{ roomId: string; status: 'joined' | 'already-member' }> {
   const uid = requireUid(request);
-  const code = validateInviteCode(asRecord(request.data)['inviteCode']);
+  const requestData = asRecord(request.data);
+  const code = validateInviteCode(requestData['inviteCode']);
+  const eventId = typeof requestData['eventId'] === 'string'
+    ? requestData['eventId'].trim()
+    : '';
   const inviteRef = db.collection('roomInvites').doc(code);
 
   const result: { roomId: string; status: 'joined' | 'already-member' } =
@@ -424,12 +446,18 @@ export async function joinRoomHandler(
       memberIds: FieldValue.arrayUnion(uid),
       updatedAt: now,
     });
-    transaction.create(roomRef.collection('activityLogs').doc(), {
+    transaction.create(
+      roomRef.collection('activityLogs').doc(`member_joined_${eventId || uid}`),
+      {
       type: 'member_joined',
       actorUserId: uid,
+      targetType: 'member',
+      targetId: uid,
       memberUserId: uid,
       createdAt: now,
-    });
+      metadata: { memberUserId: uid },
+      },
+    );
     return { roomId, status: 'joined' };
   });
 

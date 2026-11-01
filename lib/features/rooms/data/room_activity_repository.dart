@@ -4,6 +4,7 @@ abstract interface class RoomActivityRepository {
   Future<RoomActivityPage> getPage({
     required String roomId,
     RoomActivity? after,
+    RoomActivityFilter filter = RoomActivityFilter.all,
     int limit = 20,
   });
 }

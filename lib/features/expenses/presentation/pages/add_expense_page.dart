@@ -90,6 +90,18 @@ class _AddExpensePageState extends State<AddExpensePage> {
     }
     return AmbientBackground(
       child: Scaffold(
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: PrimaryButton(
+            label: expenseState.isMutating
+                ? 'Saving…'
+                : '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency ?? 'MYR')}${_amount.isEmpty ? '0' : _amount}',
+            icon: Icons.add_task_rounded,
+            loading: expenseState.isMutating,
+            onPressed: amount > 0 && !expenseState.isMutating ? _save : null,
+          ),
+        ),
         appBar: AppBar(
           leading: IconButton(
             onPressed: () => Navigator.pop(context),
@@ -102,8 +114,13 @@ class _AddExpensePageState extends State<AddExpensePage> {
           ),
           actions: [
             TextButton(
-              onPressed: amount > 0 ? _save : null,
-              child: const Text('Save'),
+              onPressed: amount > 0 && !expenseState.isMutating ? _save : null,
+              child: expenseState.isMutating
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
             ),
           ],
         ),
@@ -113,7 +130,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(18, 5, 18, 14),
+                  padding: const EdgeInsets.fromLTRB(18, 5, 18, 90),
                   children: [
                     _AmountCard(
                       controller: _amountController,
@@ -365,23 +382,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
                       ),
                     ),
                   ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: AppColors.border)),
-                ),
-                child: PrimaryButton(
-                  label: expenseState.isMutating
-                      ? 'Saving…'
-                      : '${_editing ? 'Save changes' : 'Add expense'}  ·  ${_currencySymbol(widget.room.currency ?? 'MYR')}${_amount.isEmpty ? '0' : _amount}',
-                  icon: expenseState.isMutating
-                      ? Icons.hourglass_top_rounded
-                      : Icons.add_task_rounded,
-                  onPressed: amount > 0 && !expenseState.isMutating
-                      ? _save
-                      : null,
                 ),
               ),
             ],

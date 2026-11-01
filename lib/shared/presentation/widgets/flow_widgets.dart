@@ -155,6 +155,7 @@ class PrimaryButton extends StatelessWidget {
     required this.label,
     required this.onPressed,
     this.icon,
+    this.loading = false,
     this.expand = true,
     this.backgroundColor = AppColors.primary,
     this.foregroundColor = AppColors.white,
@@ -164,6 +165,7 @@ class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+  final bool loading;
   final bool expand;
   final Color backgroundColor;
   final Color foregroundColor;
@@ -172,7 +174,12 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final button = FilledButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon ?? Icons.arrow_forward_rounded, size: 19),
+      icon: loading
+          ? const SizedBox.square(
+              dimension: 19,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(icon ?? Icons.arrow_forward_rounded, size: 19),
       label: Text(label),
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 50),
@@ -274,24 +281,22 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SurfaceCard(
-      child: Column(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 30),
-          const SizedBox(height: 9),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: AppColors.muted),
-          ),
-          if (actionLabel != null) ...[
-            const SizedBox(height: 12),
-            TextButton(onPressed: onAction, child: Text(actionLabel!)),
-          ],
+    return Column(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 30),
+        const SizedBox(height: 9),
+        Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+        if (actionLabel != null) ...[
+          const SizedBox(height: 12),
+          TextButton(onPressed: onAction, child: Text(actionLabel!)),
         ],
-      ),
+      ],
     );
   }
 }

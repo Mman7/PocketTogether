@@ -108,9 +108,8 @@ class _LoginPageState extends State<LoginPage> {
           ),
           PrimaryButton(
             label: authState.isLoading ? 'Signing in...' : 'Log in',
-            icon: authState.isLoading
-                ? Icons.hourglass_top_rounded
-                : Icons.login_rounded,
+            icon: Icons.login_rounded,
+            loading: authState.isLoading,
             onPressed: authState.isLoading ? null : _submit,
           ),
           const SizedBox(height: 12),
@@ -333,9 +332,8 @@ class _RegisterPageState extends State<RegisterPage> {
             label: authState.isLoading
                 ? 'Creating account...'
                 : 'Create account',
-            icon: authState.isLoading
-                ? Icons.hourglass_top_rounded
-                : Icons.person_add_alt_rounded,
+            icon: Icons.person_add_alt_rounded,
+            loading: authState.isLoading,
             onPressed: authState.isLoading ? null : _submit,
           ),
           const SizedBox(height: 12),
@@ -432,9 +430,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               const SizedBox(height: 18),
               PrimaryButton(
                 label: authState.isLoading ? 'Sending...' : 'Send reset link',
-                icon: authState.isLoading
-                    ? Icons.hourglass_top_rounded
-                    : Icons.send_rounded,
+                icon: Icons.send_rounded,
+                loading: authState.isLoading,
                 onPressed: authState.isLoading ? null : _submit,
               ),
             ],

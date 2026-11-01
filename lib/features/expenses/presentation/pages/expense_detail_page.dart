@@ -285,11 +285,32 @@ class ExpenseDetailPage extends StatelessWidget {
       ),
     );
     if (confirmed == true && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          duration: Duration(days: 1),
+          content: Row(
+            children: [
+              SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.white,
+                ),
+              ),
+              SizedBox(width: 12),
+              Text('Deleting expense...'),
+            ],
+          ),
+        ),
+      );
       final deleted = await context.read<ExpenseCubit>().deleteExpense(
         room.id,
         currentExpense.id,
       );
-      if (deleted && context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        if (deleted) Navigator.pop(context);
+      }
     }
   }
 }

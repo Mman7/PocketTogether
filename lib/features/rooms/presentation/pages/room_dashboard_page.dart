@@ -100,7 +100,9 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     final total = state.expenses
         .where((expense) {
           final date = expense.expenseDate;
-          return date.year == now.year && date.month == now.month;
+          return date.year == now.year &&
+              date.month == now.month &&
+              date.day == now.day;
         })
         .fold<int>(0, (sum, expense) => sum + expense.amountInCents);
     return Scaffold(
@@ -155,12 +157,12 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                   children: [
                     const Expanded(
                       child: Text(
-                        'Total spent',
+                        "Today's spending",
                         style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ),
                     StatusPill(
-                      label: _periodLabel,
+                      label: _todayLabel,
                       color: Colors.white24,
                       textColor: Colors.white,
                     ),
@@ -330,6 +332,8 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
           ),
           const SizedBox(height: 11),
           _membersCard(memberSnapshot, members),
+          // this sizedBox is for spacing above the floating action button
+          const SizedBox(height: 30),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
@@ -345,23 +349,23 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     );
   }
 
-  String get _periodLabel {
+  String get _todayLabel {
     const monthNames = [
-      'January',
-      'February',
-      'March',
-      'April',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
       'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
-    final now = DateTime.now();
-    return '${monthNames[now.month - 1]} ${now.year}';
+    final today = DateTime.now();
+    return '${today.day} ${monthNames[today.month - 1]}';
   }
 
   Widget _buildRoomDrawer(List<RoomMember> members) {
@@ -452,6 +456,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               subtitle: 'Invite someone to this room',
               iconColor: AppColors.primary,
               enabled: !_creatingInvite,
+              loading: _creatingInvite,
               onTap: () async {
                 Navigator.of(context).pop();
                 await _showInviteCode();
@@ -463,6 +468,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               subtitle: 'Remove a member from this room',
               iconColor: AppColors.secondary,
               enabled: !_removingMember,
+              loading: _removingMember,
               onTap: () async {
                 Navigator.of(context).pop();
                 await _showRemoveMemberDialog(members);
@@ -486,6 +492,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               iconColor: AppColors.danger,
               titleColor: AppColors.danger,
               enabled: !_deletingRoom,
+              loading: _deletingRoom,
               onTap: () async {
                 Navigator.of(context).pop();
                 await _confirmDeleteRoom();
@@ -505,6 +512,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     required Color iconColor,
     required VoidCallback onTap,
     required bool enabled,
+    bool loading = false,
     Color? titleColor,
   }) {
     return Padding(
@@ -553,11 +561,18 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.muted,
-                  size: 20,
-                ),
+                if (loading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.muted,
+                    size: 20,
+                  ),
               ],
             ),
           ),
@@ -679,11 +694,13 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
 
   Future<void> _showInviteCode() async {
     setState(() => _creatingInvite = true);
+    _showOperationProgress('Generating invite...');
     try {
       final invite = await widget.roomRepository.createInvite(
         roomId: widget.room.id,
       );
       if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
@@ -808,12 +825,14 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
 
   Future<void> _removeMember(RoomMember member) async {
     setState(() => _removingMember = true);
+    _showOperationProgress('Removing member...');
     try {
       await widget.roomRepository.removeMember(
         roomId: widget.room.id,
         memberId: member.userId,
       );
       if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       setState(() {
         _membersFuture = widget.roomRepository.getRoomMembers(widget.room.id);
       });
@@ -823,7 +842,8 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     } on RoomFailure catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
       }
     } finally {
       if (mounted) setState(() => _removingMember = false);
@@ -853,14 +873,18 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _deletingRoom = true);
+    _showOperationProgress('Deleting room...');
     try {
       await widget.roomRepository.deleteRoom(roomId: widget.room.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       widget.onDeleted();
-      if (mounted) Navigator.of(context).pop();
+      Navigator.of(context).pop();
     } on RoomFailure catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
       }
     } finally {
       if (mounted) setState(() => _deletingRoom = false);
@@ -874,6 +898,29 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day/$month/${local.year} at $hour:$minute';
+  }
+
+  void _showOperationProgress(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(days: 1),
+          content: Row(
+            children: [
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(message),
+            ],
+          ),
+        ),
+      );
   }
 
   void _openSection(String section, List<RoomMember> members) {
