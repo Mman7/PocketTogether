@@ -33,6 +33,7 @@ class RoomsPage extends StatefulWidget {
     required this.expenseRepository,
     required this.statisticsRepository,
     required this.activityRepository,
+    this.initialTab = 0,
     this.currentUser,
     super.key,
   });
@@ -43,6 +44,7 @@ class RoomsPage extends StatefulWidget {
   final ExpenseRepository expenseRepository;
   final ExpenseStatisticsRepository statisticsRepository;
   final RoomActivityRepository activityRepository;
+  final int initialTab;
   final AuthUser? currentUser;
 
   @override
@@ -50,13 +52,14 @@ class RoomsPage extends StatefulWidget {
 }
 
 class _RoomsPageState extends State<RoomsPage> {
-  int _selectedTab = 0;
+  late int _selectedTab;
   late final RoomCubit _roomCubit;
   late final RoomLedgerCubit _ledgerCubit;
 
   @override
   void initState() {
     super.initState();
+    _selectedTab = widget.initialTab.clamp(0, 3).toInt();
     _roomCubit = RoomCubit(widget.roomRepository)
       ..loadRooms(widget.currentUser?.uid);
     _ledgerCubit = RoomLedgerCubit(
@@ -286,7 +289,7 @@ class _RoomsPageState extends State<RoomsPage> {
             children: [
               Expanded(
                 child: PrimaryButton(
-                  label: 'Create room',
+                  label: 'Create',
                   icon: Icons.add_rounded,
                   onPressed: _showCreateRoom,
                   backgroundColor: AppColors.white,
@@ -298,7 +301,7 @@ class _RoomsPageState extends State<RoomsPage> {
                 child: OutlinedButton.icon(
                   onPressed: _showJoinRoom,
                   icon: const Icon(Icons.login_rounded, size: 18),
-                  label: const Text('Join room'),
+                  label: const Text('Join'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 50),
                     foregroundColor: AppColors.white,

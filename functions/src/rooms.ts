@@ -9,6 +9,7 @@ import {
   getFirestore,
 } from 'firebase-admin/firestore';
 import { CallableRequest, HttpsError } from 'firebase-functions/v2/https';
+import { notifyRoomMembers } from './notifications';
 
 const app = getApps().length === 0 ? initializeApp() : getApp();
 const firestore = getFirestore(app);
@@ -378,7 +379,8 @@ export async function joinRoomHandler(
   const code = validateInviteCode(asRecord(request.data)['inviteCode']);
   const inviteRef = db.collection('roomInvites').doc(code);
 
-  return db.runTransaction(async (transaction) => {
+  const result: { roomId: string; status: 'joined' | 'already-member' } =
+      await db.runTransaction(async (transaction) => {
     const inviteSnapshot = await transaction.get(inviteRef);
     if (!inviteSnapshot.exists) {
       throw new HttpsError('not-found', 'That invite code is invalid.');
@@ -430,4 +432,28 @@ export async function joinRoomHandler(
     });
     return { roomId, status: 'joined' };
   });
+
+  if (result.status === 'joined') {
+    try {
+      const room = await db.collection('rooms').doc(result.roomId).get();
+      const roomName = typeof room.get('name') === 'string' ? room.get('name') : 'your room';
+      await notifyRoomMembers(
+        db,
+        result.roomId,
+        uid,
+        `member_joined_${uid}`,
+        {
+          title: `New member in ${roomName}`,
+          body: 'A new member joined the room.',
+          data: { type: 'member_joined', roomId: result.roomId },
+        },
+      );
+    } catch (error) {
+      console.error('Unable to deliver member notification', {
+        roomId: result.roomId,
+        error,
+      });
+    }
+  }
+  return result;
 }

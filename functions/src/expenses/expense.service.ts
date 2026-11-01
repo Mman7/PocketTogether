@@ -15,6 +15,8 @@ import {
   RebuildResult,
   SummaryTarget,
 } from './expense.types';
+import { notifyRoomMembers } from '../notifications';
+import { createHash } from 'node:crypto';
 
 export class ExpenseService {
   constructor(
@@ -44,6 +46,12 @@ export class ExpenseService {
         note: input.note ?? null,
       });
     });
+    await this.notifyExpense(
+      input,
+      uid,
+      'expense_created',
+      `expense_created_${input.expenseId}`,
+    );
     return { expenseId: input.expenseId };
   }
 
@@ -73,6 +81,12 @@ export class ExpenseService {
         note: input.note ?? null,
       });
     });
+    await this.notifyExpense(
+      input,
+      uid,
+      'expense_updated',
+      `expense_updated_${input.expenseId}_${this.updateEventKey(input)}`,
+    );
     return { expenseId: input.expenseId };
   }
 
@@ -190,6 +204,50 @@ export class ExpenseService {
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };
+  }
+
+  private async notifyExpense(
+    input: ExpenseInput,
+    actorUserId: string,
+    type: 'expense_created' | 'expense_updated',
+    eventId: string,
+  ): Promise<void> {
+    try {
+      const [room, profile] = await Promise.all([
+        this.db.collection('rooms').doc(input.roomId).get(),
+        this.db.collection('users').doc(actorUserId).get(),
+      ]);
+      const roomName = typeof room.get('name') === 'string' ? room.get('name') : 'your room';
+      const actorName = typeof profile.get('displayName') === 'string'
+        ? profile.get('displayName')
+        : 'A member';
+      const currency = typeof room.get('currency') === 'string' ? room.get('currency') : 'MYR';
+      const amount = `${currency} ${(input.amountInCents / 100).toFixed(2)}`;
+      await notifyRoomMembers(this.db, input.roomId, actorUserId, eventId, {
+        title: type === 'expense_created' ? `New expense in ${roomName}` : `Expense updated in ${roomName}`,
+        body: `${actorName} added ${input.category} - ${amount}`,
+        data: {
+          type,
+          roomId: input.roomId,
+          expenseId: input.expenseId,
+        },
+      });
+    } catch (error) {
+      console.error('Unable to deliver expense notification', { type, roomId: input.roomId, error });
+    }
+  }
+
+  private updateEventKey(input: ExpenseInput): string {
+    return createHash('sha256')
+      .update(JSON.stringify({
+        amountInCents: input.amountInCents,
+        category: input.category,
+        note: input.note,
+        expenseDate: input.expenseDate.toMillis(),
+        splitAmountsInCents: input.splitAmountsInCents,
+      }))
+      .digest('hex')
+      .slice(0, 16);
   }
 }
 
