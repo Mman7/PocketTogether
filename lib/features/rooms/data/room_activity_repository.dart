@@ -9,6 +9,7 @@ abstract interface class RoomActivityRepository {
   });
 }
 
+/// User-facing failure produced while loading the activity timeline.
 class RoomActivityFailure implements Exception {
   const RoomActivityFailure(this.message);
 

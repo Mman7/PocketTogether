@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user.dart';
 import 'profile_repository.dart';
 
+/// Firestore-backed access to the authenticated user's profile document.
+///
+/// Profile creation is idempotent at the application level: an existing
+/// document is preserved while missing profiles receive the initial fields.
 class FirebaseProfileRepository implements ProfileRepository {
   FirebaseProfileRepository(this._firestore);
 
@@ -30,11 +34,13 @@ class FirebaseProfileRepository implements ProfileRepository {
     required String displayName,
     required String email,
   }) async {
+    // A server read avoids treating stale local cache data as proof that the
+    // profile exists during authentication recovery.
     try {
       final document = _users.doc(uid);
       final snapshot = await document.get(GetOptions(source: Source.server));
       if (!snapshot.exists) {
-        return;
+        await document.set(_newProfileData(displayName, email));
       } else if (snapshot.data()?['email'] != email.trim()) {
         await document.set({'email': email.trim()}, SetOptions(merge: true));
       }
@@ -53,9 +59,11 @@ class FirebaseProfileRepository implements ProfileRepository {
       final createdAt = data['createdAt'];
       return UserProfile(
         uid: uid,
-        displayName: data['displayName'] as String? ?? '',
-        email: data['email'] as String?,
-        createdAt: createdAt is Timestamp ? createdAt.toDate() : null,
+        displayName: data['displayName'] is String
+            ? data['displayName'] as String
+            : '',
+        email: data['email'] is String ? data['email'] as String : null,
+        createdAt: _dateValue(createdAt),
       );
     } on FirebaseException {
       throw const ProfileFailure('Unable to load your profile. Try again.');
@@ -79,4 +87,11 @@ class FirebaseProfileRepository implements ProfileRepository {
     'email': email.trim(),
     'createdAt': FieldValue.serverTimestamp(),
   };
+}
+
+DateTime? _dateValue(Object? value) {
+  if (value is Timestamp) return value.toDate().toUtc();
+  if (value is DateTime) return value.toUtc();
+  if (value is String) return DateTime.tryParse(value)?.toUtc();
+  return null;
 }

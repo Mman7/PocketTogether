@@ -8,7 +8,14 @@ import {
 
 import { ExpenseInput, PersistedExpense, SummaryTarget } from './expense.types';
 
-/** Calculates summary deltas and persists them within the caller's transaction. */
+/**
+ * Calculates integer-cent summary deltas and persists them in the caller's
+ * transaction.
+ *
+ * Summary documents are denormalized read models. They are updated with
+ * `FieldValue.increment` inside the same transaction as the expense change,
+ * so a failed mutation cannot publish only half of its derived totals.
+ */
 export class ExpenseSummary {
   constructor(private readonly db?: Firestore) {}
 
@@ -69,7 +76,8 @@ export class ExpenseSummary {
     existing: DocumentReference[],
     targets: SummaryTarget[],
   ): Promise<void> {
-    // Rebuilds use bounded batches; run them in a controlled maintenance window.
+    // Rebuilds use bounded batches because Firestore limits a write batch to
+    // 500 operations. The 400 threshold leaves room for future bookkeeping.
     const db = this.db;
     if (!db) throw new Error('Firestore is required to persist rebuilt summaries.');
     let batch = db.batch();

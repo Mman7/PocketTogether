@@ -4,6 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/room_activity.dart';
 import 'room_activity_repository.dart';
 
+/// Reads the append-only room activity log using a stable Firestore cursor.
+///
+/// `createdAt` and document ID are ordered together so entries with identical
+/// server timestamps still have deterministic pagination. The corresponding
+/// composite indexes are declared in `firestore.indexes.json`.
 class FirebaseRoomActivityRepository implements RoomActivityRepository {
   FirebaseRoomActivityRepository(this._firestore);
 
@@ -16,6 +21,7 @@ class FirebaseRoomActivityRepository implements RoomActivityRepository {
     RoomActivityFilter filter = RoomActivityFilter.all,
     int limit = 20,
   }) async {
+    // Fetch one extra document to determine hasMore without a count query.
     debugPrint(
       '[RoomActivity] Loading room=$roomId filter=${filter.name} '
       'types=${filter.types} limit=$limit after=${after?.id}',

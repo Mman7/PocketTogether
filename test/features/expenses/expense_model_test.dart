@@ -39,4 +39,29 @@ void main() {
 
     expect(expense.hasValidSplit, isFalse);
   });
+
+  test('returns null for malformed or fractional Firestore data', () {
+    expect(
+      Expense.tryFromMap('expense-2', {
+        'amountInCents': 1000.5,
+        'category': 'Food',
+        'paidByUserId': 'user-1',
+        'createdByUserId': 'user-1',
+        'splitAmountsInCents': {'user-1': 1000},
+        'expenseDate': DateTime.utc(2026, 10, 17),
+      }),
+      isNull,
+    );
+    expect(
+      Expense.tryFromMap('expense-3', {
+        'amountInCents': 1000,
+        'category': 'Food',
+        'paidByUserId': 'user-1',
+        'createdByUserId': 'user-1',
+        'splitAmountsInCents': {'user-1': '1000'},
+        'expenseDate': 'invalid-date',
+      }),
+      isNull,
+    );
+  });
 }

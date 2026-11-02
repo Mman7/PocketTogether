@@ -4,6 +4,10 @@ import '../../data/room_activity_repository.dart';
 import '../../models/room_activity.dart';
 import 'room_activity_state.dart';
 
+/// Coordinates filtered, cursor-paginated activity loading for one room.
+///
+/// Each new load increments [_requestVersion]. Responses from an older filter
+/// or refresh are ignored so a slower request cannot replace newer state.
 class RoomActivityCubit extends Cubit<RoomActivityState> {
   RoomActivityCubit(this._repository) : super(const RoomActivityState());
 
@@ -15,6 +19,8 @@ class RoomActivityCubit extends Cubit<RoomActivityState> {
     String roomId, {
     RoomActivityFilter filter = RoomActivityFilter.all,
   }) async {
+    // Reset the page when the room or filter changes; pagination belongs to
+    // the specific query represented by the current state.
     final requestVersion = ++_requestVersion;
     _roomId = roomId;
     emit(RoomActivityState(filter: filter, isLoading: true, hasMore: true));
@@ -43,6 +49,8 @@ class RoomActivityCubit extends Cubit<RoomActivityState> {
       return;
     }
 
+    // Keep the request version stable for this page so a concurrent refresh
+    // can invalidate the response without cancelling the underlying Future.
     final requestVersion = _requestVersion;
     emit(state.copyWith(isLoadingMore: true, clearErrorMessage: true));
     try {

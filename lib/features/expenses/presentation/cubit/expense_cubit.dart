@@ -6,6 +6,10 @@ import '../../data/expense_repository.dart';
 import '../../models/expense.dart';
 import 'expense_state.dart';
 
+/// Owns the room expense stream and serializes expense mutations for the UI.
+///
+/// The subscription is replaced when the room changes and cancelled in
+/// [close] so Firestore callbacks cannot outlive the Cubit.
 class ExpenseCubit extends Cubit<ExpenseState> {
   ExpenseCubit(this._repository) : super(const ExpenseState());
 
@@ -15,6 +19,8 @@ class ExpenseCubit extends Cubit<ExpenseState> {
 
   Future<void> loadExpenses(String roomId) async {
     if (_watchedRoomId == roomId && _expensesSubscription != null) return;
+    // Cancel before subscribing to the new room to prevent cross-room data
+    // from arriving after the room context has changed.
     await _expensesSubscription?.cancel();
     _watchedRoomId = roomId;
     emit(ExpenseState(expenses: state.expenses, isLoading: true));

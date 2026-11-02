@@ -3,6 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'expense_statistics_model.dart';
 import 'expense_statistics_repository.dart';
 
+/// Reads pre-aggregated room and member totals maintained by Cloud Functions.
+///
+/// The four documents are independent summary views, so they are fetched in
+/// parallel. Missing summary documents intentionally map to zero through
+/// [_int], which supports rooms created before statistics were introduced.
 class FirebaseExpenseStatisticsRepository
     implements ExpenseStatisticsRepository {
   FirebaseExpenseStatisticsRepository(this._firestore);

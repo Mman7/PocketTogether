@@ -7,6 +7,10 @@ import '../../models/room.dart';
 import '../../models/room_operation_result.dart';
 import 'room_state.dart';
 
+/// Owns the signed-in user's room stream and room-level mutations.
+///
+/// Room writes are delegated to the repository's callable Functions; this
+/// Cubit only manages loading, mutation progress, and presentation state.
 class RoomCubit extends Cubit<RoomState> {
   RoomCubit(this._repository) : super(const RoomState());
 

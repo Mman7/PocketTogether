@@ -21,6 +21,7 @@ abstract interface class ExpenseRepository {
   });
 }
 
+/// User-facing failure produced by the expense data layer.
 class ExpenseFailure implements Exception {
   const ExpenseFailure(this.message);
 

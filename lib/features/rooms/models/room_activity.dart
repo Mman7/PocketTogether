@@ -1,5 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// Filters activity logs by the event types written by Cloud Functions.
+///
+/// The filter is intentionally represented as the existing string values
+/// rather than a new Firestore field, so changing it does not require a data
+/// migration or alter the existing `whereIn` queries.
 enum RoomActivityFilter {
   all,
   expenses,
@@ -12,6 +17,11 @@ enum RoomActivityFilter {
   };
 }
 
+/// A normalized activity-log entry displayed in a room timeline.
+///
+/// Activity documents may come from more than one schema version. The model
+/// keeps both current target fields and legacy `expenseId`/`memberUserId`
+/// fields so historical entries remain readable.
 class RoomActivity {
   const RoomActivity({
     required this.id,
@@ -39,10 +49,16 @@ class RoomActivity {
 
   bool get isMember => _isTarget('member');
 
+  /// Returns a metadata amount only when it represents a whole cent value.
+  ///
+  /// Firestore numeric values can arrive as either `int` or `double`. A
+  /// fractional value is rejected instead of being silently truncated.
   int? get amountInCents => _integerMetadata('amountInCents');
 
   int? get previousAmountInCents => _integerMetadata('previousAmountInCents');
 
+  /// Returns the updated amount, falling back to the event amount for older
+  /// activity records that did not store a separate new amount.
   int? get newAmountInCents =>
       _integerMetadata('newAmountInCents') ?? amountInCents;
 
@@ -84,6 +100,9 @@ class RoomActivity {
     );
   }
 
+  // A recognized targetType is authoritative when it disagrees with the
+  // event prefix. Older documents without targetType are inferred from the
+  // event type or their legacy ID field.
   bool _isTarget(String expectedTargetType) {
     if (targetType == 'expense' || targetType == 'member') {
       return targetType == expectedTargetType;
@@ -119,6 +138,9 @@ class RoomActivity {
     required String? legacyExpenseId,
     required String? legacyMemberId,
   }) {
+    // When both legacy IDs exist, prefer the ID belonging to the resolved
+    // target type. This prevents a malformed mixed-version document from
+    // pointing a member event at an expense.
     if (rawTargetId != null) return rawTargetId;
     return switch (targetType) {
       'expense' => legacyExpenseId ?? legacyMemberId,
@@ -158,6 +180,7 @@ class RoomActivity {
   }
 }
 
+/// One page of activity results and whether another cursor page is available.
 class RoomActivityPage {
   const RoomActivityPage({required this.items, required this.hasMore});
 

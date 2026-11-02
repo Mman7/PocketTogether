@@ -11,6 +11,10 @@ import '../../models/room_ledger.dart';
 import 'room_ledger_state.dart';
 
 /// Loads members and expenses for every room the user belongs to.
+/// Loads the read-only data needed by history and statistics screens.
+///
+/// A monotonically increasing request ID prevents results from a previous
+/// room list from replacing state after the user changes rooms or signs out.
 class RoomLedgerCubit extends Cubit<RoomLedgerState> {
   RoomLedgerCubit({
     required this.roomRepository,

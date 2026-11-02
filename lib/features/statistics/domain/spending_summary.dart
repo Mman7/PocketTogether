@@ -37,6 +37,8 @@ class SpendingSummary {
   /// largest first.
   final List<MapEntry<String, int>> byMember;
 
+  /// Uses integer division because the display value is still denominated in
+  /// cents; currency formatting happens only at the presentation boundary.
   int get dailyAverageInCents => dayCount == 0 ? 0 : totalInCents ~/ dayCount;
 
   factory SpendingSummary.forPeriod({
@@ -71,6 +73,8 @@ class SpendingSummary {
     final categoryTotals = <String, int>{};
     final memberTotals = <String, int>{};
     for (final expense in expenses) {
+      // Transfers settle balances but are not spending and must not inflate
+      // category, member, or daily-average totals.
       if (expense.category == 'Transfer') continue;
       final date = _dateOnly(expense.expenseDate);
       if (date.isBefore(start) || date.isAfter(end)) continue;

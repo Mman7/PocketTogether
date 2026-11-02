@@ -1,5 +1,9 @@
 import '../../models/room_activity.dart';
 
+/// Immutable view state for the room activity timeline.
+///
+/// [isLoading] describes the first page, while [isLoadingMore] describes a
+/// cursor request that keeps already loaded entries visible.
 class RoomActivityState {
   const RoomActivityState({
     this.items = const [],

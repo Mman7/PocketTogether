@@ -5,6 +5,7 @@ import { getAuth } from 'firebase-admin/auth';
 import {
   FieldValue,
   Firestore,
+  Query,
   Timestamp,
   getFirestore,
 } from 'firebase-admin/firestore';
@@ -18,6 +19,7 @@ const inviteLength = 8;
 // Invite lifetime in milliseconds (1 days)
 const inviteLifetimeMs = 1 * 24 * 60 * 60 * 1000;
 const maxInviteAttempts = 8;
+const deleteBatchSize = 400;
 
 interface CreateRoomData {
   name?: unknown;
@@ -116,6 +118,25 @@ function validExpiry(value: unknown): value is Timestamp {
   return value instanceof Timestamp;
 }
 
+async function deleteQueryInBatches(
+  db: Firestore,
+  query: Query,
+): Promise<void> {
+  // Room deletion is deliberately not one unbounded transaction: a room can
+  // contain more documents than Firestore permits in a single transaction.
+  // Repeating bounded batches keeps each commit within the write limit.
+  while (true) {
+    const snapshot = await query.limit(deleteBatchSize).get();
+    if (snapshot.empty) return;
+
+    const batch = db.batch();
+    for (const document of snapshot.docs) batch.delete(document.ref);
+    await batch.commit();
+
+    if (snapshot.size < deleteBatchSize) return;
+  }
+}
+
 export async function createRoomHandler(
   request: CallableRequest<CreateRoomData>,
   db: Firestore = firestore,
@@ -141,6 +162,8 @@ export async function createRoomHandler(
     const expiresAt = Timestamp.fromMillis(Date.now() + inviteLifetimeMs);
     try {
       await db.runTransaction(async (transaction) => {
+        // Room, owner membership, first activity, and invite must appear
+        // together so a successfully created room is immediately joinable.
         const existingInvite = await transaction.get(inviteRef);
         if (existingInvite.exists) throw new InviteCodeCollision();
 
@@ -255,26 +278,24 @@ export async function deleteRoomHandler(
   }
 
   const roomRef = db.collection('rooms').doc(roomId);
-  await db.runTransaction(async (transaction) => {
-    const roomSnapshot = await transaction.get(roomRef);
-    if (!roomSnapshot.exists) {
-      throw new HttpsError('not-found', 'This room is no longer available.');
-    }
-    if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
-      throw new HttpsError('permission-denied', 'Only the room owner can delete the room.');
-    }
-    const [memberSnapshot, expenseSnapshot, inviteSnapshot, activitySnapshot] = await Promise.all([
-      transaction.get(roomRef.collection('members')),
-      transaction.get(roomRef.collection('expenses')),
-      transaction.get(db.collection('roomInvites').where('roomId', '==', roomId)),
-      transaction.get(roomRef.collection('activityLogs')),
-    ]);
-    for (const document of memberSnapshot.docs) transaction.delete(document.ref);
-    for (const document of expenseSnapshot.docs) transaction.delete(document.ref);
-    for (const document of inviteSnapshot.docs) transaction.delete(document.ref);
-    for (const document of activitySnapshot.docs) transaction.delete(document.ref);
-    transaction.delete(roomRef);
-  });
+  const roomSnapshot = await roomRef.get();
+  if (!roomSnapshot.exists) {
+    throw new HttpsError('not-found', 'This room is no longer available.');
+  }
+  if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
+    throw new HttpsError('permission-denied', 'Only the room owner can delete the room.');
+  }
+
+  await Promise.all([
+    deleteQueryInBatches(db, roomRef.collection('members')),
+    deleteQueryInBatches(db, roomRef.collection('expenses')),
+    deleteQueryInBatches(db, roomRef.collection('activityLogs')),
+    deleteQueryInBatches(
+      db,
+      db.collection('roomInvites').where('roomId', '==', roomId),
+    ),
+  ]);
+  await db.batch().delete(roomRef).commit();
 
   return { roomId };
 }

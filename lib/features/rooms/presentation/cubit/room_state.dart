@@ -1,6 +1,10 @@
 import '../../models/room.dart';
 import '../../models/room_operation_result.dart';
 
+/// View state for room loading, creation, joining, and related errors.
+///
+/// Separate error fields let a room-list failure coexist with a join or create
+/// result without replacing unrelated data already shown on screen.
 class RoomState {
   const RoomState({
     this.isLoading = false,

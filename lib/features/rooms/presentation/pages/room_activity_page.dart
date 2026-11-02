@@ -13,6 +13,11 @@ import '../../models/room_member.dart';
 import '../cubit/room_activity_cubit.dart';
 import '../cubit/room_activity_state.dart';
 
+/// Displays a room's filtered activity timeline with pull-to-refresh and
+/// cursor pagination.
+///
+/// The page owns the Cubit and scroll controller because both are scoped to
+/// this room screen and must be disposed together when the route closes.
 class RoomActivityPage extends StatefulWidget {
   const RoomActivityPage({
     required this.room,
@@ -54,6 +59,8 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
   }
 
   void _loadWhenNearEnd() {
+    // Load before the viewport reaches the end so the footer rarely becomes
+    // the only visible content while the next page is being fetched.
     if (_scrollController.hasClients &&
         _scrollController.position.extentAfter < 320) {
       _cubit.loadMore();
@@ -159,6 +166,8 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
   }
 
   String _actorName(RoomActivity activity) {
+    // Member events identify the affected member, while expense events are
+    // attributed to the actor. Metadata remains a fallback for old logs.
     if (activity.isMember && activity.memberUserId != null) {
       return _names[activity.memberUserId!] ??
           activity.memberDisplayName ??

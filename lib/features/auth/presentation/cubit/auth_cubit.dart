@@ -10,6 +10,11 @@ import '../../../profile/data/profile_repository.dart';
 import '../../../profile/data/firebase_profile_repository.dart';
 import 'auth_state.dart';
 
+/// Coordinates authentication actions and profile validation for the app.
+///
+/// Auth SDK state changes trigger profile validation, while [_validationRequest]
+/// coalesces duplicate startup checks. Repository and Firestore authorization
+/// remain separate concerns owned by their respective data layers.
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit({
     FirebaseAuth? firebaseAuth,
@@ -114,6 +119,8 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> initialize({bool force = false}) async {
+    // Multiple auth callbacks can arrive during startup. Reuse the in-flight
+    // validation unless the caller explicitly requests a fresh check.
     if (!force && _validationRequest != null) return _validationRequest!;
     final request = _validateCurrentSession();
     _validationRequest = request;

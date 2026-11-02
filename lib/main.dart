@@ -10,9 +10,6 @@ import 'app/app.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/notifications/notification_handler.dart';
 
-// TODO check outside stats how it get data
-// TODO add timeline
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

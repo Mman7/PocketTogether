@@ -2,6 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+/// Paints the app's animated ambient background behind a page.
+///
+/// The animation stops when the platform requests reduced motion. The widget
+/// owns and disposes its controller because the animation is page-scoped.
 class AmbientBackground extends StatefulWidget {
   const AmbientBackground({required this.child, super.key});
 

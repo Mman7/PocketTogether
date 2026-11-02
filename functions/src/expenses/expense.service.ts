@@ -18,6 +18,14 @@ import {
 import { notifyRoomMembers } from '../notifications';
 import { createHash } from 'node:crypto';
 
+/**
+ * Applies expense mutations and keeps derived summaries and activity logs in
+ * sync with the source expense document.
+ *
+ * Each mutation uses a Firestore transaction so a retry cannot leave the
+ * expense, counters, and activity log in different states. Callable input has
+ * already been validated by the schema before it reaches this service.
+ */
 export class ExpenseService {
   constructor(
     private readonly db: Firestore,
@@ -32,6 +40,8 @@ export class ExpenseService {
       await this.assertRoomMember(transaction, roomRef, uid, input);
       const existing = await this.expenses.readExpense(transaction, expenseRef);
       if (existing.exists) {
+        // Callable retries are safe when the same expense ID carries the same
+        // payload; a different payload is rejected instead of overwriting it.
         const previous = this.readPersisted(existing.data());
         if (!sameExpense(previous, input)) {
           throw new HttpsError('already-exists', 'This expense ID is already in use.');
@@ -67,6 +77,8 @@ export class ExpenseService {
       }
       await this.assertRoomMember(transaction, roomRef, uid, input);
       if (sameExpense(previous, input)) return;
+      // Remove the old contribution before applying the new one so summary
+      // counters remain correct when amount, payer, date, or split changes.
       const update: Record<string, unknown> = {
         ...input,
         updatedAt: FieldValue.serverTimestamp(),

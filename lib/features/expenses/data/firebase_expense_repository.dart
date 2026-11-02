@@ -6,6 +6,11 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../models/expense.dart';
 import 'expense_repository.dart';
 
+/// Firebase adapter for expense reads and server-authoritative mutations.
+///
+/// Expense creation, updates, and deletion use callable Functions so split
+/// validation, room membership checks, summary updates, and activity logging
+/// happen together on the server.
 class FirebaseExpenseRepository implements ExpenseRepository {
   FirebaseExpenseRepository(this._firestore, {FirebaseFunctions? functions})
     : _functions =
@@ -19,13 +24,17 @@ class FirebaseExpenseRepository implements ExpenseRepository {
 
   @override
   Stream<List<Expense>> watchExpenses(String roomId) {
+    // Cached snapshots are intentionally retained for offline readability;
+    // the server snapshot will reconcile the list when connectivity returns.
     return _expenses(roomId)
         .orderBy('expenseDate', descending: true)
-        .snapshots(includeMetadataChanges: true)
-        .where((snapshot) => !snapshot.metadata.isFromCache)
+        .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((document) => Expense.fromMap(document.id, document.data()))
+              .map(
+                (document) => Expense.tryFromMap(document.id, document.data()),
+              )
+              .whereType<Expense>()
               .toList(),
         )
         .transform(
@@ -49,7 +58,8 @@ class FirebaseExpenseRepository implements ExpenseRepository {
           .orderBy('expenseDate', descending: true)
           .get();
       return snapshot.docs
-          .map((document) => Expense.fromMap(document.id, document.data()))
+          .map((document) => Expense.tryFromMap(document.id, document.data()))
+          .whereType<Expense>()
           .toList();
     } on FirebaseException {
       throw const ExpenseFailure('Unable to load expenses. Please try again.');
@@ -131,6 +141,8 @@ class FirebaseExpenseRepository implements ExpenseRepository {
   }
 
   void _validate(Expense expense) {
+    // This is an early UX check only. The callable schema validates the same
+    // invariants again before any Firestore write is allowed.
     if (expense.amountInCents <= 0 ||
         expense.paidByUserId.isEmpty ||
         expense.createdByUserId.isEmpty ||

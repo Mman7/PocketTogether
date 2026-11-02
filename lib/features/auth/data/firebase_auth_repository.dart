@@ -3,6 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/auth_user.dart';
 import 'auth_repository.dart';
 
+/// Firebase Authentication adapter used by the auth Cubit.
+///
+/// This class translates provider-specific failures into stable user-facing
+/// [AuthFailure] messages; it does not decide whether a Firestore profile is
+/// valid or whether a room operation is authorized.
 class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository(this._firebaseAuth);
 
@@ -73,6 +78,7 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (error) {
+      // Do not reveal whether an email is registered through this endpoint.
       if (error.code == 'user-not-found') return;
       throw AuthFailure(_messageFor(error));
     }

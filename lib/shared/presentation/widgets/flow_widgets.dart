@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_theme.dart';
 
+/// A bordered surface with optional gradient, shadow, and tap handling.
 class SurfaceCard extends StatelessWidget {
   const SurfaceCard({
     required this.child,
@@ -51,6 +52,7 @@ class SurfaceCard extends StatelessWidget {
   }
 }
 
+/// Displays initials for a member when no image asset is available.
 class MemberAvatar extends StatelessWidget {
   const MemberAvatar({
     required this.name,
@@ -95,6 +97,7 @@ class MemberAvatar extends StatelessWidget {
   }
 }
 
+/// Shows a compact, capped list of member avatars with an overflow count.
 class AvatarStack extends StatelessWidget {
   const AvatarStack({required this.names, this.maxVisible = 4, super.key});
 
@@ -150,6 +153,10 @@ class AvatarStack extends StatelessWidget {
   }
 }
 
+/// Standard primary action button used by form and mutation flows.
+///
+/// When [loading] is true, the action remains visually occupied by a spinner
+/// and callers should pass a null [onPressed] to prevent duplicate submits.
 class PrimaryButton extends StatelessWidget {
   const PrimaryButton({
     required this.label,

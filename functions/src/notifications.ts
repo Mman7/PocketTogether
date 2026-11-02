@@ -4,8 +4,9 @@ import { getMessaging } from 'firebase-admin/messaging';
 
 const app = getApps().length === 0 ? initializeApp() : getApp();
 const messaging = getMessaging(app);
-// TODO test the notification sending functionality
+// TODO: Add emulator/integration coverage for token selection and send retries.
 
+/** Payload sent to room members after a successful room mutation. */
 export interface RoomNotification {
   title: string;
   body: string;
@@ -19,6 +20,8 @@ export async function notifyRoomMembers(
   eventId: string,
   notification: RoomNotification,
 ): Promise<void> {
+  // The event document makes repeated callable retries idempotent: only the
+  // first transaction that claims an event is allowed to send notifications.
   const eventRef = db
     .collection('rooms')
     .doc(roomId)
@@ -56,6 +59,7 @@ export async function notifyRoomMembers(
     )
   ).flatMap((snapshot) => snapshot.docs);
 
+  // FCM multicast accepts at most 500 registration tokens per request.
   for (let offset = 0; offset < tokenDocuments.length; offset += 500) {
     const batch = tokenDocuments.slice(offset, offset + 500);
     const tokens = batch

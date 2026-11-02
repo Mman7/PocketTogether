@@ -10,6 +10,12 @@ import '../models/room_member.dart';
 import '../models/room_operation_result.dart';
 import 'room_repository.dart';
 
+/// Firebase adapter for room reads and callable room mutations.
+///
+/// Core writes intentionally go through Cloud Functions, where membership and
+/// owner checks are authoritative. Client-side parsing and filtering here are
+/// for resilience and presentation only; they do not replace Security Rules
+/// or callable authorization.
 class FirebaseRoomRepository implements RoomRepository {
   FirebaseRoomRepository(this._firestore, {FirebaseFunctions? functions})
     : _functions =
@@ -23,13 +29,15 @@ class FirebaseRoomRepository implements RoomRepository {
 
   @override
   Stream<List<Room>> watchMyRooms(String userId) {
+    // The local cache is allowed to emit first so offline users can still see
+    // their last known rooms; Firestore reconciles the stream when online.
     return _rooms
         .where('memberIds', arrayContains: userId)
-        .snapshots(includeMetadataChanges: true)
-        .where((snapshot) => !snapshot.metadata.isFromCache)
+        .snapshots()
         .map((snapshot) {
           final rooms = snapshot.docs
-              .map((document) => Room.fromMap(document.id, document.data()))
+              .map((document) => Room.tryFromMap(document.id, document.data()))
+              .whereType<Room>()
               .toList();
           rooms.sort((first, second) {
             final firstCreatedAt = first.createdAt;
@@ -64,12 +72,8 @@ class FirebaseRoomRepository implements RoomRepository {
           .call<List<dynamic>>({'roomId': roomId});
       final members = result.data
           .whereType<Map>()
-          .map(
-            (data) => RoomMember.fromMap(
-              data['userId'] as String,
-              Map<String, dynamic>.from(data),
-            ),
-          )
+          .map(_parseMember)
+          .whereType<RoomMember>()
           .toList();
       members.sort((first, second) {
         if (first.isOwner == second.isOwner) {
@@ -83,6 +87,18 @@ class FirebaseRoomRepository implements RoomRepository {
     } on FirebaseException {
       throw const RoomFailure('Unable to load room members. Please try again.');
     }
+  }
+
+  RoomMember? _parseMember(Map<dynamic, dynamic> data) {
+    // Callable responses are untrusted input at this boundary. Invalid
+    // entries are skipped so one malformed member does not hide the room.
+    final userId = data['userId'];
+    if (userId is! String ||
+        userId.isEmpty ||
+        data.keys.any((key) => key is! String)) {
+      return null;
+    }
+    return RoomMember.tryFromMap(userId, Map<String, dynamic>.from(data));
   }
 
   @override

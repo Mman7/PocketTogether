@@ -5,6 +5,11 @@ import 'room_role.dart';
 
 part 'room_member.g.dart';
 
+/// A member snapshot returned by the room-members callable.
+///
+/// Membership mutations are performed by Cloud Functions. This model is a
+/// read representation, so a missing or unrecognized role falls back to the
+/// non-owner role rather than granting owner UI affordances.
 @JsonSerializable()
 class RoomMember {
   final String userId;
@@ -24,13 +29,25 @@ class RoomMember {
   bool get isOwner => role == RoomRole.owner;
 
   factory RoomMember.fromMap(String userId, Map<String, dynamic> data) {
-    return RoomMember.fromJson({
-      ...data,
-      'userId': userId,
-      'displayName': data['displayName'] ?? 'Unknown',
-      'role': data['role'] == 'owner' ? 'owner' : 'member',
-      'joinedAt': _dateAsJson(data['joinedAt']),
-    });
+    final member = tryFromMap(userId, data);
+    if (member == null) {
+      throw const FormatException('Invalid room member document.');
+    }
+    return member;
+  }
+
+  static RoomMember? tryFromMap(String userId, Map<String, dynamic> data) {
+    if (userId.isEmpty) return null;
+    final displayName = data['displayName'];
+    return RoomMember(
+      userId: userId,
+      displayName: displayName is String && displayName.trim().isNotEmpty
+          ? displayName
+          : 'Unknown',
+      email: _nullableString(data['email']),
+      role: data['role'] == 'owner' ? RoomRole.owner : RoomRole.member,
+      joinedAt: _dateValue(data['joinedAt']),
+    );
   }
 
   Map<String, dynamic> toMap() => toJson();
@@ -41,9 +58,11 @@ class RoomMember {
   Map<String, dynamic> toJson() => _$RoomMemberToJson(this);
 }
 
-String? _dateAsJson(Object? value) {
-  if (value is String) return value;
-  if (value is DateTime) return value.toIso8601String();
-  if (value is Timestamp) return value.toDate().toIso8601String();
+String? _nullableString(Object? value) => value is String ? value : null;
+
+DateTime? _dateValue(Object? value) {
+  if (value is String) return DateTime.tryParse(value)?.toUtc();
+  if (value is DateTime) return value.toUtc();
+  if (value is Timestamp) return value.toDate().toUtc();
   return null;
 }
