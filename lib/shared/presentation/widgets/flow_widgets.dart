@@ -10,6 +10,7 @@ class SurfaceCard extends StatelessWidget {
     this.color = AppColors.white,
     this.gradient,
     this.shadowColor = const Color(0x080F172A),
+    this.borderColor = AppColors.border,
     this.radius = AppRadii.card,
     this.onTap,
     super.key,
@@ -20,6 +21,7 @@ class SurfaceCard extends StatelessWidget {
   final Color color;
   final Gradient? gradient;
   final Color shadowColor;
+  final Color borderColor;
   final double radius;
   final VoidCallback? onTap;
 
@@ -35,7 +37,7 @@ class SurfaceCard extends StatelessWidget {
           padding: padding,
           decoration: BoxDecoration(
             gradient: gradient,
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: borderColor),
             borderRadius: BorderRadius.circular(radius),
             boxShadow: [
               BoxShadow(
