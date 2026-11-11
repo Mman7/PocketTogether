@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/category_emoji.dart';
@@ -101,7 +102,24 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
             );
           }
           if (state.expenses.isEmpty) {
-            return const Center(child: Text('No expenses yet.'));
+            return Center(
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  Lottie.asset(
+                    'assets/lottie/no_result.lottie',
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.cover,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'No expenses yet.',
+                    style: TextStyle(color: AppColors.muted),
+                  ),
+                ],
+              ),
+            );
           }
 
           final monthKeys =

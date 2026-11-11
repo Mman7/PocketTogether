@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lottie/lottie.dart';
 import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -1092,14 +1093,14 @@ class _RoomEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SurfaceCard(
+    return SurfaceCard(
       child: Column(
         children: [
-          Icon(Icons.receipt_long_outlined, color: AppColors.primary, size: 30),
-          SizedBox(height: 8),
-          Text(
-            'No expenses yet',
-            style: TextStyle(fontWeight: FontWeight.w800),
+          Lottie.asset(
+            'assets/lottie/no_result.lottie',
+            width: 100,
+            height: 100,
+            fit: BoxFit.cover,
           ),
           SizedBox(height: 3),
           Text(

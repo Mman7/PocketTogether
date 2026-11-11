@@ -229,7 +229,6 @@ class _HistoryPageState extends State<HistoryPage> {
                 const Center(child: CircularProgressIndicator())
               else if (filtered.isEmpty)
                 const EmptyPanel(
-                  icon: Icons.search_off_rounded,
                   title: 'No matching expenses',
                   message: 'Try another search or clear your filters.',
                 )

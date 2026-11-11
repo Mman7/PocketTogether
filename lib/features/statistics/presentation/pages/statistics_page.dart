@@ -60,7 +60,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     )
                   else if (state.errorMessage != null)
                     EmptyPanel(
-                      icon: Icons.error_outline_rounded,
                       title: 'Your statistics are unavailable',
                       message: state.errorMessage!,
                       compact: true,
@@ -87,7 +86,6 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     ]
                   else
                     const EmptyPanel(
-                      icon: Icons.insights_outlined,
                       title: 'No personal spending yet',
                       message: 'Expenses you pay will appear here.',
                       compact: true,

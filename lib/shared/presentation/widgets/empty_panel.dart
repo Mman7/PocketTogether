@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../app/theme/app_theme.dart';
 import 'flow_widgets.dart';
 
 class EmptyPanel extends StatelessWidget {
   const EmptyPanel({
-    required this.icon,
     required this.title,
     required this.message,
     this.compact = false,
     super.key,
   });
 
-  final IconData icon;
   final String title;
   final String message;
   final bool compact;
@@ -23,7 +22,7 @@ class EmptyPanel extends StatelessWidget {
       padding: EdgeInsets.all(compact ? 15 : 24),
       child: Row(
         children: [
-          Icon(icon, size: 25, color: AppColors.primary),
+          Lottie.asset('assets/lottie/no_result.lottie', width: 70, height: 70),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

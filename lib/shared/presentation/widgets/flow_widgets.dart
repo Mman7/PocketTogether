@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../app/theme/app_theme.dart';
 
@@ -54,7 +56,7 @@ class SurfaceCard extends StatelessWidget {
   }
 }
 
-/// Displays initials for a member when no image asset is available.
+/// Displays a deterministic Clay avatar for a member.
 class MemberAvatar extends StatelessWidget {
   const MemberAvatar({
     required this.name,
@@ -71,6 +73,45 @@ class MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarUri = Uri.https('api.dicebear.com', '/10.x/clay/svg', {
+      'seed': name,
+      'backgroundColor': 'e2ecf4',
+    });
+    final fallback = _InitialsAvatar(name: name, size: size, color: color);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: border ? Border.all(color: AppColors.white, width: 2) : null,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SvgPicture.network(
+        avatarUri.toString(),
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        placeholderBuilder: (_) => fallback,
+        errorBuilder: (_, _, _) => fallback,
+      ),
+    );
+  }
+}
+
+class _InitialsAvatar extends StatelessWidget {
+  const _InitialsAvatar({
+    required this.name,
+    required this.size,
+    required this.color,
+  });
+
+  final String name;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
     final initials = name
         .split(' ')
         .map((part) => part.isEmpty ? '' : part[0])
@@ -81,11 +122,7 @@ class MemberAvatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: border ? Border.all(color: AppColors.white, width: 2) : null,
-      ),
+      color: color,
       alignment: Alignment.center,
       child: Text(
         initials,
@@ -276,7 +313,6 @@ class EmptyState extends StatelessWidget {
   const EmptyState({
     required this.title,
     required this.message,
-    this.icon = Icons.receipt_long_outlined,
     this.actionLabel,
     this.onAction,
     super.key,
@@ -284,7 +320,6 @@ class EmptyState extends StatelessWidget {
 
   final String title;
   final String message;
-  final IconData icon;
   final String? actionLabel;
   final VoidCallback? onAction;
 
@@ -292,7 +327,12 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: AppColors.primary, size: 30),
+        Lottie.asset(
+          'assets/lottie/no_result.lottie',
+          width: 100,
+          height: 100,
+          fit: BoxFit.cover,
+        ),
         const SizedBox(height: 9),
         Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
         const SizedBox(height: 4),

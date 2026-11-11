@@ -104,7 +104,6 @@ class _RoomActivityPageState extends State<RoomActivityPage> {
         child: SizedBox(
           width: double.infinity,
           child: EmptyState(
-            icon: Icons.timeline_outlined,
             title: 'No activity yet',
             message: 'Room updates will appear here.',
           ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../app/theme/app_theme.dart';
 import '../../../auth/models/auth_user.dart';
@@ -43,10 +44,7 @@ class _ProfilePageState extends State<ProfilePage> {
               SurfaceCard(
                 child: Row(
                   children: [
-                    _ProfileAvatar(
-                      name: displayName,
-                      photoUrl: widget.user?.photoUrl,
-                    ),
+                    _ProfileAvatar(name: displayName),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -152,43 +150,31 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({required this.name, this.photoUrl});
+  const _ProfileAvatar({required this.name});
 
   final String name;
-  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
-    final url = photoUrl?.trim();
-    if (url == null || url.isEmpty) {
-      return MemberAvatar(
-        name: name,
-        size: 60,
-        color: const Color(0xFFD9E8FF),
-        border: false,
-      );
-    }
+    final avatarUri = Uri.https('api.dicebear.com', '/10.x/clay/svg', {
+      'seed': name,
+      'backgroundColor': 'e2ecf4',
+    });
+    final fallback = MemberAvatar(
+      name: name,
+      size: 60,
+      color: const Color(0xFFD9E8FF),
+      border: false,
+    );
 
     return ClipOval(
-      child: Image.network(
-        url,
+      child: SvgPicture.network(
+        avatarUri.toString(),
         width: 60,
         height: 60,
         fit: BoxFit.cover,
-        loadingBuilder: (context, child, progress) => progress == null
-            ? child
-            : MemberAvatar(
-                name: name,
-                size: 60,
-                color: const Color(0xFFD9E8FF),
-                border: false,
-              ),
-        errorBuilder: (context, error, stackTrace) => MemberAvatar(
-          name: name,
-          size: 60,
-          color: const Color(0xFFD9E8FF),
-          border: false,
-        ),
+        placeholderBuilder: (_) => fallback,
+        errorBuilder: (_, _, _) => fallback,
       ),
     );
   }

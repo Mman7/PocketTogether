@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../cubit/profile_cubit.dart';
 
@@ -36,42 +37,44 @@ class _EditDisplayNamePageState extends State<EditDisplayNamePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit display name')),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _nameController,
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
-                    labelText: 'Display name',
-                    hintText: 'Enter your name',
+    return AmbientBackground(
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Edit display name')),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Display name',
+                      hintText: 'Enter your name',
+                    ),
+                    validator: (value) => value?.trim().isNotEmpty == true
+                        ? null
+                        : 'Enter a display name.',
+                    onFieldSubmitted: (_) => _save(),
                   ),
-                  validator: (value) => value?.trim().isNotEmpty == true
-                      ? null
-                      : 'Enter a display name.',
-                  onFieldSubmitted: (_) => _save(),
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: _isSaving ? null : _save,
-                  icon: _isSaving
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check_rounded),
-                  label: Text(_isSaving ? 'Saving...' : 'Save changes'),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _isSaving ? null : _save,
+                    icon: _isSaving
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_rounded),
+                    label: Text(_isSaving ? 'Saving...' : 'Save changes'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
