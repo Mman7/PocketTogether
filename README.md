@@ -1,6 +1,11 @@
 # PocketTogether
 
 > Shared expenses, simplified. Manage room spending, track contributions, and stay in sync with everyone.
+> 
+
+https://github.com/user-attachments/assets/87622962-19a4-444b-a7a0-e4398d6eda3f
+
+
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter&logoColor=white)](https://flutter.dev/)
 [![Dart](https://img.shields.io/badge/Dart-3.13%2B-0175C2?logo=dart&logoColor=white)](https://dart.dev/)
