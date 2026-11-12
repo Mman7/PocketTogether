@@ -98,6 +98,8 @@ class RoomExpenseTile extends StatelessWidget {
     required this.paidByName,
     required this.createdByCurrentUser,
     required this.onTap,
+    this.showDate = false,
+    this.roomName,
     super.key,
   });
 
@@ -106,12 +108,18 @@ class RoomExpenseTile extends StatelessWidget {
   final String paidByName;
   final bool createdByCurrentUser;
   final VoidCallback onTap;
+  final bool showDate;
+  final String? roomName;
 
   @override
   Widget build(BuildContext context) {
     final description = expense.note?.trim();
     final createdTime = formatShortTime(expense.createdAt);
-    return SurfaceCard(
+    final dateOnly = formatShortDate(expense.expenseDate);
+    final dateLabel = showDate
+        ? (createdTime == null ? dateOnly : '$dateOnly · $createdTime')
+        : createdTime ?? dateOnly;
+    final card = SurfaceCard(
       onTap: onTap,
       color: createdByCurrentUser ? AppColors.expenseMine : AppColors.white,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -201,10 +209,29 @@ class RoomExpenseTile extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                createdTime ?? formatShortDate(expense.expenseDate),
+                dateLabel,
                 style: const TextStyle(color: AppColors.muted, fontSize: 12),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+    if (roomName == null) return card;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          card,
+          Positioned(
+            top: -12,
+            right: -10,
+            child: StatusPill(
+              label: roomName!,
+              color: AppColors.paleBlue,
+              textColor: AppColors.primary,
+            ),
           ),
         ],
       ),

@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme/app_theme.dart';
-import '../../../../shared/presentation/category_emoji.dart';
 import '../../../../shared/presentation/money_format.dart';
-import '../../../../shared/presentation/short_date.dart';
 import '../../../../shared/presentation/widgets/empty_panel.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../../shared/presentation/widgets/page_header.dart';
 import '../../../rooms/models/room_ledger.dart';
 import '../../../rooms/presentation/cubit/room_ledger_cubit.dart';
+import '../../../rooms/presentation/widgets/room_expenses_section.dart';
 import '../../data/expense_repository.dart';
 import '../../models/expense.dart';
 import '../cubit/expense_cubit.dart';
@@ -285,23 +284,15 @@ class _HistoryPageState extends State<HistoryPage> {
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
       ),
-      SurfaceCard(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children: [
-            for (var index = 0; index < grouped.length; index++) ...[
-              _ExpenseRow(
-                entry: grouped[index],
-                currentUserId: widget.currentUserId,
-                currentUserDisplayName: widget.currentUserDisplayName,
-                onTap: () => _openExpense(grouped[index]),
-              ),
-              if (index != grouped.length - 1)
-                const Divider(height: 1, indent: 68, color: AppColors.paleBlue),
-            ],
-          ],
+      for (var index = 0; index < grouped.length; index++) ...[
+        _ExpenseRow(
+          entry: grouped[index],
+          currentUserId: widget.currentUserId,
+          currentUserDisplayName: widget.currentUserDisplayName,
+          onTap: () => _openExpense(grouped[index]),
         ),
-      ),
+        if (index != grouped.length - 1) const SizedBox(height: 8),
+      ],
     ];
   }
 
@@ -390,74 +381,17 @@ class _ExpenseRow extends StatelessWidget {
         memberName == 'Unknown member' && expense.paidByUserId == currentUserId
         ? currentUserDisplayName
         : memberName;
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColors.paleBlue,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                categoryIcon(expense.category),
-                size: 20,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    expense.note?.isNotEmpty == true
-                        ? expense.note!
-                        : expense.category,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      MemberAvatar(name: paidByName, size: 16),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          'Paid by $paidByName · ${formatShortDate(expense.expenseDate)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              formatCurrency(
-                expense.amountInCents,
-                currency: entry.ledger.currency,
-              ),
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontFeatures: [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ),
+    return RoomExpenseTile(
+      expense: expense,
+      amount: formatCurrency(
+        expense.amountInCents,
+        currency: entry.ledger.currency,
       ),
+      paidByName: paidByName,
+      roomName: entry.ledger.room.name,
+      createdByCurrentUser: expense.createdByUserId == currentUserId,
+      showDate: true,
+      onTap: onTap,
     );
   }
 }

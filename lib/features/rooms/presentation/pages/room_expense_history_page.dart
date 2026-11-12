@@ -295,6 +295,7 @@ class _RoomExpenseHistoryPageState extends State<RoomExpenseHistoryPage> {
                           nameById[expense.paidByUserId] ?? 'Unknown member',
                       createdByCurrentUser:
                           expense.createdByUserId == widget.currentUserId,
+                      showDate: true,
                       onTap: () => Navigator.of(context).push<void>(
                         MaterialPageRoute<void>(
                           builder: (_) => BlocProvider.value(
