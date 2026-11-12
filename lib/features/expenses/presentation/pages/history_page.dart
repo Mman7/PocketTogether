@@ -424,12 +424,22 @@ class _ExpenseRow extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    'Paid by $paidByName · ${formatShortDate(expense.expenseDate)}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.muted,
-                    ),
+                  Row(
+                    children: [
+                      MemberAvatar(name: paidByName, size: 16),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Paid by $paidByName · ${formatShortDate(expense.expenseDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

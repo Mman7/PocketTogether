@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:lottie/lottie.dart';
 import 'package:pocket_together/shared/presentation/widgets/ambient_background.dart';
 
 import '../../../../app/theme/app_theme.dart';
@@ -21,6 +20,7 @@ import 'room_members_page.dart';
 import 'room_expense_history_page.dart';
 import 'room_statistics_page.dart';
 import 'room_activity_page.dart';
+import '../widgets/room_expenses_section.dart';
 
 class RoomDashboardPage extends StatefulWidget {
   const RoomDashboardPage({
@@ -314,7 +314,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
               ),
             ),
           const SizedBox(height: 20),
-          _RoomExpensesSection(
+          RoomExpensesSection(
             roomCurrency: widget.room.currency,
             members: members,
             currentUserId: widget.currentUserId,
@@ -968,84 +968,6 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
   }
 }
 
-class _RoomExpensesSection extends StatelessWidget {
-  const _RoomExpensesSection({
-    required this.roomCurrency,
-    required this.members,
-    required this.currentUserId,
-    required this.onViewAll,
-    required this.onExpenseTap,
-  });
-
-  final String? roomCurrency;
-  final List<RoomMember> members;
-  final String currentUserId;
-  final VoidCallback onViewAll;
-  final ValueChanged<Expense> onExpenseTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<ExpenseCubit, ExpenseState>(
-      builder: (context, state) {
-        final today = state.expenses.where((expense) {
-          final date = expense.expenseDate;
-          final now = DateTime.now();
-          return date.year == now.year &&
-              date.month == now.month &&
-              date.day == now.day;
-        }).toList();
-        final nameById = {
-          for (final member in members) member.userId: member.displayName,
-        };
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SectionHeading(
-              "Today's expenses",
-              icon: Icons.wallet,
-              trailing: TextButton(
-                onPressed: onViewAll,
-                child: const Text('View all'),
-              ),
-            ),
-            const SizedBox(height: 5),
-            if (state.isLoading && state.expenses.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (state.expenses.isEmpty && state.errorMessage == null)
-              const _RoomEmptyState()
-            else
-              for (final expense in today.take(5)) ...[
-                RoomExpenseTile(
-                  expense: expense,
-                  amount: formatCurrency(
-                    expense.amountInCents,
-                    currency: roomCurrency,
-                  ),
-                  paidByName:
-                      nameById[expense.paidByUserId] ?? 'Unknown member',
-                  createdByCurrentUser:
-                      expense.createdByUserId == currentUserId,
-                  onTap: () => onExpenseTap(expense),
-                ),
-                const SizedBox(height: 8),
-              ],
-            if (!state.isLoading && state.expenses.isNotEmpty && today.isEmpty)
-              const Text(
-                'No expenses today',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.muted),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
 class _QuickAction {
   const _QuickAction(this.label, this.icon);
 
@@ -1081,32 +1003,6 @@ class _Metric extends StatelessWidget {
               color: AppColors.white,
               fontWeight: FontWeight.w800,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoomEmptyState extends StatelessWidget {
-  const _RoomEmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    return SurfaceCard(
-      child: Column(
-        children: [
-          Lottie.asset(
-            'assets/lottie/no_result.lottie',
-            width: 100,
-            height: 100,
-            fit: BoxFit.cover,
-          ),
-          SizedBox(height: 3),
-          Text(
-            'Add the first shared expense to get started.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: AppColors.muted),
           ),
         ],
       ),

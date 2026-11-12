@@ -82,10 +82,7 @@ class MemberAvatar extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: border ? Border.all(color: AppColors.white, width: 2) : null,
-      ),
+      decoration: BoxDecoration(shape: BoxShape.circle),
       clipBehavior: Clip.antiAlias,
       child: SvgPicture.network(
         avatarUri.toString(),

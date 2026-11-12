@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/auth_user.dart';
 import 'auth_repository.dart';
@@ -47,7 +48,15 @@ class FirebaseAuthRepository implements AuthRepository {
   @override
   Future<void> signInWithGoogle() async {
     try {
-      await _firebaseAuth.signInWithProvider(GoogleAuthProvider());
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return;
+
+      final googleAuthentication = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuthentication.accessToken,
+        idToken: googleAuthentication.idToken,
+      );
+      await _firebaseAuth.signInWithCredential(credential);
     } on FirebaseAuthException catch (error) {
       throw AuthFailure(_messageFor(error));
     }

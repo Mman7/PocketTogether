@@ -260,40 +260,102 @@ class _ActivityContent extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(_icon(), color: AppColors.primary, size: 19),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$actorName ${details.action}',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    if (details.subject != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        details.subject!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: AppColors.muted),
+          SurfaceCard(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 78,
+                  height: 78,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      MemberAvatar(name: actorName, size: 78),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.white,
+                              width: 3,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            _icon(),
+                            color: AppColors.white,
+                            size: 18,
+                          ),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 3),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '$actorName ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            TextSpan(text: details.action),
+                          ],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      if (details.subject != null) ...[
+                        const SizedBox(height: 8),
+                        StatusPill(
+                          label: details.subject!,
+                          color: AppColors.paleBlue,
+                          textColor: AppColors.primary,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (details.amount != null)
+                      Text(
+                        details.amount!,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
                     Text(
-                      '${details.amount ?? ''}${details.amount == null ? '' : ' · '}${_time(activity.createdAt)}',
+                      _time(activity.createdAt),
                       style: const TextStyle(
                         color: AppColors.muted,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),

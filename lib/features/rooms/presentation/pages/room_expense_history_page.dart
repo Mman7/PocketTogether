@@ -13,6 +13,7 @@ import '../../../expenses/presentation/cubit/expense_state.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
 import '../../models/room.dart';
 import '../../models/room_member.dart';
+import '../widgets/room_expenses_section.dart';
 
 class RoomExpenseHistoryPage extends StatefulWidget {
   const RoomExpenseHistoryPage({
@@ -532,116 +533,6 @@ class _RoomExpenseDateHeading extends StatelessWidget {
           ),
           const Spacer(),
           StatusPill(label: formatCurrency(total, currency: currency)),
-        ],
-      ),
-    );
-  }
-}
-
-class RoomExpenseTile extends StatelessWidget {
-  const RoomExpenseTile({
-    required this.expense,
-    required this.amount,
-    required this.paidByName,
-    required this.createdByCurrentUser,
-    required this.onTap,
-    super.key,
-  });
-
-  final Expense expense;
-  final String amount;
-  final String paidByName;
-  final bool createdByCurrentUser;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final description = expense.note?.trim();
-    final createdTime = formatShortTime(expense.createdAt);
-    return SurfaceCard(
-      onTap: onTap,
-      color: createdByCurrentUser ? AppColors.expenseMine : AppColors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              categoryIcon(expense.category),
-              size: 20,
-              color: createdByCurrentUser
-                  ? Colors.deepPurpleAccent
-                  : AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        description == null || description.isEmpty
-                            ? expense.category
-                            : description,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (createdByCurrentUser)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.expenseMineBadge,
-                            borderRadius: BorderRadius.circular(AppRadii.pill),
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            child: Text(
-                              'You',
-                              style: TextStyle(
-                                color: Colors.deepPurpleAccent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  'Paid by $paidByName· ${formatShortDate(expense.expenseDate)}'
-                  '${createdTime == null ? '' : ' · $createdTime'}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            amount,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
         ],
       ),
     );
