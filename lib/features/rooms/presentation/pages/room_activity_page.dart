@@ -266,18 +266,18 @@ class _ActivityContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 SizedBox(
-                  width: 78,
-                  height: 78,
+                  width: 58,
+                  height: 58,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      MemberAvatar(name: actorName, size: 78),
+                      MemberAvatar(name: actorName, size: 58),
                       Positioned(
                         right: -2,
                         bottom: -2,
                         child: Container(
-                          width: 36,
-                          height: 36,
+                          width: 26,
+                          height: 26,
                           decoration: BoxDecoration(
                             color: AppColors.primary,
                             shape: BoxShape.circle,
@@ -290,7 +290,7 @@ class _ActivityContent extends StatelessWidget {
                           child: Icon(
                             _icon(),
                             color: AppColors.white,
-                            size: 18,
+                            size: 13,
                           ),
                         ),
                       ),
@@ -317,7 +317,7 @@ class _ActivityContent extends StatelessWidget {
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(fontSize: 14),
                       ),
                       if (details.subject != null) ...[
                         const SizedBox(height: 8),
@@ -340,7 +340,7 @@ class _ActivityContent extends StatelessWidget {
                         details.amount!,
                         textAlign: TextAlign.right,
                         style: const TextStyle(
-                          fontSize: 22,
+                          fontSize: 18,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
