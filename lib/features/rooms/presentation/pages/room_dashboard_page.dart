@@ -20,6 +20,7 @@ import 'room_members_page.dart';
 import 'room_expense_history_page.dart';
 import 'room_statistics_page.dart';
 import 'room_activity_page.dart';
+import '../widgets/room_actions_drawer.dart';
 import '../widgets/room_expenses_section.dart';
 
 class RoomDashboardPage extends StatefulWidget {
@@ -49,9 +50,11 @@ class RoomDashboardPage extends StatefulWidget {
 class _RoomDashboardPageState extends State<RoomDashboardPage> {
   late final ExpenseCubit _expenseCubit;
   late Future<List<RoomMember>> _membersFuture;
+  String _roomName = '';
   bool _creatingInvite = false;
   bool _removingMember = false;
   bool _deletingRoom = false;
+  bool _renamingRoom = false;
 
   @override
   void initState() {
@@ -59,6 +62,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     _expenseCubit = ExpenseCubit(widget.expenseRepository)
       ..loadExpenses(widget.room.id);
     _membersFuture = widget.roomRepository.getRoomMembers(widget.room.id);
+    _roomName = widget.room.name;
   }
 
   @override
@@ -113,7 +117,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
           children: [
             Flexible(
               child: Text(
-                widget.room.name,
+                _roomName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -138,7 +142,17 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
         ],
       ),
       endDrawer: widget.room.ownerId == widget.currentUserId
-          ? _buildRoomDrawer(members)
+          ? RoomActionsDrawer(
+              roomName: _roomName,
+              creatingInvite: _creatingInvite,
+              removingMember: _removingMember,
+              deletingRoom: _deletingRoom,
+              onGenerateInvite: _showInviteCode,
+              onRemoveMember: () => _showRemoveMemberDialog(members),
+              onDeleteRoom: _confirmDeleteRoom,
+              onRenameRoom: _showRenameRoomDialog,
+              renamingRoom: _renamingRoom,
+            )
           : null,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 90),
@@ -369,217 +383,39 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     return '${today.day} ${monthNames[today.month - 1]}';
   }
 
-  Widget _buildRoomDrawer(List<RoomMember> members) {
-    return Drawer(
-      backgroundColor: AppColors.canvas,
-      child: SafeArea(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 18, 12, 20),
-              decoration: const BoxDecoration(
-                color: AppColors.paleBlue,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(AppRadii.card),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Room actions',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                        tooltip: 'Close',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.home_work_outlined,
-                        color: AppColors.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          widget.room.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Owner controls',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
-              child: Text(
-                'PEOPLE',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.muted,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            _roomActionTile(
-              icon: Icons.mail_outline_rounded,
-              title: 'Generate invite',
-              subtitle: 'Invite someone to this room',
-              iconColor: AppColors.primary,
-              enabled: !_creatingInvite,
-              loading: _creatingInvite,
-              onTap: () async {
-                Navigator.of(context).pop();
-                await _showInviteCode();
-              },
-            ),
-            _roomActionTile(
-              icon: Icons.person_remove_outlined,
-              title: 'Remove member',
-              subtitle: 'Remove a member from this room',
-              iconColor: AppColors.secondary,
-              enabled: !_removingMember,
-              loading: _removingMember,
-              onTap: () async {
-                Navigator.of(context).pop();
-                await _showRemoveMemberDialog(members);
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 22, 16, 8),
-              child: Text(
-                'DANGER ZONE',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ),
-            _roomActionTile(
-              icon: Icons.delete_outline_rounded,
-              title: 'Delete room',
-              subtitle: 'Permanently delete this room',
-              iconColor: AppColors.danger,
-              titleColor: AppColors.danger,
-              enabled: !_deletingRoom,
-              loading: _deletingRoom,
-              onTap: () async {
-                Navigator.of(context).pop();
-                await _confirmDeleteRoom();
-              },
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+  Future<void> _showRenameRoomDialog() async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _RenameRoomDialog(initialName: _roomName),
     );
+    if (name == null || !mounted || name == _roomName) return;
+    await _renameRoom(name);
   }
 
-  Widget _roomActionTile({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color iconColor,
-    required VoidCallback onTap,
-    required bool enabled,
-    bool loading = false,
-    Color? titleColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Material(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: iconColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, color: iconColor, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: titleColor ?? AppColors.ink,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (loading)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.muted,
-                    size: 20,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _renameRoom(String name) async {
+    setState(() => _renamingRoom = true);
+    _showOperationProgress('Renaming room...');
+    try {
+      await widget.roomRepository.renameRoom(
+        roomId: widget.room.id,
+        name: name,
+      );
+      if (!mounted) return;
+      setState(() {
+        _roomName = name;
+      });
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Room name updated.')));
+    } on RoomFailure catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _renamingRoom = false);
+    }
   }
 
   Widget _membersCard(
@@ -684,10 +520,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
     Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => AmbientBackground(
-          child: RoomMembersPage(
-            roomName: widget.room.name,
-            members: latestMembers,
-          ),
+          child: RoomMembersPage(roomName: _roomName, members: latestMembers),
         ),
       ),
     );
@@ -710,7 +543,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Share this code to invite people to ${widget.room.name}.'),
+              Text('Share this code to invite people to $_roomName.'),
               const SizedBox(height: 16),
               SelectableText(
                 invite.inviteCode,
@@ -857,7 +690,7 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete room?'),
         content: Text(
-          'This will permanently delete ${widget.room.name}, its expenses, and its members.',
+          'This will permanently delete $_roomName, its expenses, and its members.',
         ),
         actions: [
           TextButton(
@@ -964,6 +797,69 @@ class _RoomDashboardPageState extends State<RoomDashboardPage> {
       MaterialPageRoute<void>(
         builder: (_) => BlocProvider.value(value: _expenseCubit, child: page),
       ),
+    );
+  }
+}
+
+class _RenameRoomDialog extends StatefulWidget {
+  const _RenameRoomDialog({required this.initialName});
+
+  final String initialName;
+
+  @override
+  State<_RenameRoomDialog> createState() => _RenameRoomDialogState();
+}
+
+class _RenameRoomDialogState extends State<_RenameRoomDialog> {
+  late final TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Change room name'),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _controller,
+          autofocus: true,
+          maxLength: 20,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Room name'),
+          validator: (value) {
+            final name = value?.trim() ?? '';
+            if (name.isEmpty) return 'Enter a room name.';
+            if (name.length > 20) return 'Use 20 characters or fewer.';
+            return null;
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.of(context).pop(_controller.text.trim());
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

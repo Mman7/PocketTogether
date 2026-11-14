@@ -165,6 +165,23 @@ class FirebaseRoomRepository implements RoomRepository {
   }
 
   @override
+  Future<void> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    try {
+      await _functions.httpsCallable('renameRoom').call<void>({
+        'roomId': roomId,
+        'name': name.trim(),
+      });
+    } on FirebaseFunctionsException catch (error) {
+      throw _roomFailureFromFunction(error);
+    } on FirebaseException {
+      throw const RoomFailure('Unable to rename the room. Please try again.');
+    }
+  }
+
+  @override
   Future<RoomCreationResult> createRoom({
     required String name,
     required String currency,

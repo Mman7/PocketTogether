@@ -7,6 +7,7 @@ import {
   deleteRoomHandler,
   getRoomMembersHandler,
   joinRoomHandler,
+  renameRoomHandler,
   removeRoomMemberHandler,
 } from './rooms';
 import {
@@ -26,6 +27,8 @@ export const createRoomInvite = onCall((request) =>
 );
 
 export const deleteRoom = onCall((request) => deleteRoomHandler(request));
+
+export const renameRoom = onCall((request) => renameRoomHandler(request));
 
 export const removeRoomMember = onCall((request) =>
   removeRoomMemberHandler(request),

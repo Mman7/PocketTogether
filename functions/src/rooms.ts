@@ -30,6 +30,11 @@ interface DeleteRoomData {
   roomId?: unknown;
 }
 
+interface RenameRoomData {
+  roomId?: unknown;
+  name?: unknown;
+}
+
 interface RemoveRoomMemberData {
   roomId?: unknown;
   memberId?: unknown;
@@ -144,10 +149,10 @@ export async function createRoomHandler(
   const uid = requireUid(request);
   const data = asRecord(request.data);
   const name = typeof data['name'] === 'string' ? data['name'].trim() : '';
-  if (name.length < 1 || name.length > 80) {
+  if (name.length < 1 || name.length > 20) {
     throw new HttpsError(
       'invalid-argument',
-      'Room name must be between 1 and 80 characters.',
+      'Room name must be between 1 and 20 characters.',
     );
   }
   const currency =
@@ -298,6 +303,55 @@ export async function deleteRoomHandler(
   await db.batch().delete(roomRef).commit();
 
   return { roomId };
+}
+
+export async function renameRoomHandler(
+  request: CallableRequest<RenameRoomData>,
+  db: Firestore = firestore,
+): Promise<{ roomId: string; name: string }> {
+  const uid = requireUid(request);
+  const data = asRecord(request.data);
+  const roomId = typeof data['roomId'] === 'string' ? data['roomId'].trim() : '';
+  const name = typeof data['name'] === 'string' ? data['name'].trim() : '';
+  if (roomId.length === 0) {
+    throw new HttpsError('invalid-argument', 'A room is required.');
+  }
+  if (name.length < 1 || name.length > 20) {
+    throw new HttpsError(
+      'invalid-argument',
+      'Room name must be between 1 and 20 characters.',
+    );
+  }
+
+  const roomRef = db.collection('rooms').doc(roomId);
+  await db.runTransaction(async (transaction) => {
+    const roomSnapshot = await transaction.get(roomRef);
+    if (!roomSnapshot.exists) {
+      throw new HttpsError('not-found', 'This room is no longer available.');
+    }
+    if (roomSnapshot.get('createdBy') !== uid && roomSnapshot.get('ownerId') !== uid) {
+      throw new HttpsError('permission-denied', 'Only the room owner can rename the room.');
+    }
+
+    const previousName = roomSnapshot.get('name');
+    transaction.update(roomRef, {
+      name,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+    transaction.create(roomRef.collection('activityLogs').doc(`room_renamed_${Date.now()}_${uid}`), {
+      type: 'room_renamed',
+      actorUserId: uid,
+      targetType: 'room',
+      targetId: roomId,
+      createdAt: FieldValue.serverTimestamp(),
+      metadata: {
+        previousName: typeof previousName === 'string' ? previousName : '',
+        roomName: name,
+      },
+    });
+  });
+
+  return { roomId, name };
 }
 
 export async function removeRoomMemberHandler(

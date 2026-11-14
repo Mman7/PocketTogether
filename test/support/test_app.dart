@@ -218,6 +218,28 @@ class FakeRoomRepository implements RoomRepository {
   }
 
   @override
+  Future<void> renameRoom({
+    required String roomId,
+    required String name,
+  }) async {
+    if (failure != null) throw failure!;
+    final index = rooms.indexWhere((room) => room.id == roomId);
+    if (index < 0) return;
+    final room = rooms[index];
+    rooms[index] = Room(
+      id: room.id,
+      name: name,
+      createdAt: room.createdAt,
+      updatedAt: DateTime.utc(2026),
+      description: room.description,
+      currency: room.currency,
+      ownerId: room.ownerId,
+      memberIds: room.memberIds,
+    );
+    _roomsController.add(List.of(rooms));
+  }
+
+  @override
   Future<RoomJoinResult> joinRoom({required String inviteCode}) async {
     if (failure != null) throw failure!;
     if (inviteCode == 'BAD123' || inviteCode == 'EXPIRED') {

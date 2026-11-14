@@ -9,6 +9,7 @@ import {
   deleteRoomHandler,
   getRoomMembersHandler,
   joinRoomHandler,
+  renameRoomHandler,
   removeRoomMemberHandler,
 } from '../src/rooms';
 import {
@@ -45,6 +46,10 @@ test('room callables reject unauthenticated requests', async () => {
   );
   await expectHttpsError(joinRoomHandler(request({ inviteCode: 'ABCDEFGH' })), 'unauthenticated');
   await expectHttpsError(deleteRoomHandler(request({ roomId: 'room-id' })), 'unauthenticated');
+  await expectHttpsError(
+    renameRoomHandler(request({ roomId: 'room-id', name: 'Renamed' })),
+    'unauthenticated',
+  );
   await expectHttpsError(
     removeRoomMemberHandler(request({ roomId: 'room-id', memberId: 'member-id' })),
     'unauthenticated',
@@ -83,7 +88,20 @@ test('createRoom validates the room name before accessing Firestore', async () =
     'invalid-argument',
   );
   await expectHttpsError(
-    createRoomHandler(request({ name: 'x'.repeat(81) }, 'owner-id')),
+    createRoomHandler(request({ name: 'x'.repeat(21) }, 'owner-id')),
+    'invalid-argument',
+  );
+});
+
+test('renameRoom validates the room name before accessing Firestore', async () => {
+  await expectHttpsError(
+    renameRoomHandler(request({ roomId: 'room-id', name: '' }, 'owner-id')),
+    'invalid-argument',
+  );
+  await expectHttpsError(
+    renameRoomHandler(
+      request({ roomId: 'room-id', name: 'x'.repeat(21) }, 'owner-id'),
+    ),
     'invalid-argument',
   );
 });

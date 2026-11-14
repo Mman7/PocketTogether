@@ -81,15 +81,20 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
                       TextFormField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
+                        maxLength: 20,
                         decoration: const InputDecoration(
                           labelText: 'Room name',
                           hintText: 'e.g. Weekend in Penang',
                           prefixIcon: Icon(Icons.groups_outlined),
                         ),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? 'Give your room a name'
-                            : null,
+                        validator: (value) {
+                          final name = value?.trim() ?? '';
+                          if (name.isEmpty) return 'Give your room a name';
+                          if (name.length > 20) {
+                            return 'Use 20 characters or fewer.';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
