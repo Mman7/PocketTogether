@@ -2,7 +2,7 @@ import { getApp, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { CallableRequest, HttpsError } from 'firebase-functions/v2/https';
 
-import { ExpenseService } from './expense.service';
+import { createExpenseService } from './expense.service';
 import {
   parseExpenseIds,
   parseExpenseInput,
@@ -10,7 +10,7 @@ import {
 } from './expense.schema';
 
 const app = getApps().length === 0 ? initializeApp() : getApp();
-const service = new ExpenseService(getFirestore(app));
+const service = createExpenseService(getFirestore(app));
 
 function requireUid(request: CallableRequest<unknown>): string {
   const uid = request.auth?.uid;

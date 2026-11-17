@@ -1,0 +1,31 @@
+import { onCall } from 'firebase-functions/v2/https';
+
+import {
+  createRoomHandler,
+  createRoomInviteHandler,
+  deleteRoomHandler,
+  getRoomMembersHandler,
+  joinRoomHandler,
+  renameRoomHandler,
+  removeRoomMemberHandler,
+} from './room.controller';
+
+export const createRoom = onCall((request) => createRoomHandler(request));
+
+export const createRoomInvite = onCall((request) =>
+  createRoomInviteHandler(request),
+);
+
+export const deleteRoom = onCall((request) => deleteRoomHandler(request));
+
+export const renameRoom = onCall((request) => renameRoomHandler(request));
+
+export const removeRoomMember = onCall((request) =>
+  removeRoomMemberHandler(request),
+);
+
+export const getRoomMembers = onCall((request) =>
+  getRoomMembersHandler(request),
+);
+
+export const joinRoom = onCall((request) => joinRoomHandler(request));

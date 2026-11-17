@@ -5,7 +5,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
 
 import { parseExpenseInput } from '../src/expenses/expense.schema';
-import { ExpenseSummary } from '../src/expenses/expense-summary';
+import { createExpenseSummary } from '../src/expenses/expense-summary';
 
 const baseInput = {
   roomId: 'room-1',
@@ -34,7 +34,7 @@ test('schema validates cents and rejects unsafe or mismatched splits', () => {
 
 test('summary contributions use UTC month IDs and all four destinations', () => {
   const expense = parseExpenseInput(baseInput, 'user-1', true);
-  const targets = new ExpenseSummary().contribution(expense, 1);
+  const targets = createExpenseSummary().contribution(expense, 1);
 
   assert.deepEqual(targets, [
     { path: ['stats', 'summary'], field: 'totalExpenseInCents', delta: 5000 },
@@ -51,7 +51,7 @@ test('summary contributions use UTC month IDs and all four destinations', () => 
     },
   ]);
   assert.equal(
-    new ExpenseSummary().contribution(expense, -1)[0].delta,
+    createExpenseSummary().contribution(expense, -1)[0].delta,
     -5000,
   );
 });

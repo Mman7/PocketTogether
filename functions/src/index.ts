@@ -1,15 +1,14 @@
 import { setGlobalOptions } from 'firebase-functions/v2';
-import { onCall } from 'firebase-functions/v2/https';
 
 import {
-  createRoomHandler,
-  createRoomInviteHandler,
-  deleteRoomHandler,
-  getRoomMembersHandler,
-  joinRoomHandler,
-  renameRoomHandler,
-  removeRoomMemberHandler,
-} from './rooms';
+  createRoom,
+  createRoomInvite,
+  deleteRoom,
+  getRoomMembers,
+  joinRoom,
+  renameRoom,
+  removeRoomMember,
+} from './rooms/room.functions';
 import {
   createExpense,
   deleteExpense,
@@ -17,27 +16,23 @@ import {
   updateExpense,
 } from './expenses/expense.functions';
 
-
 setGlobalOptions({ maxInstances: 10, region: 'us-central1' });
 
-export const createRoom = onCall((request) => createRoomHandler(request));
+// room functions
+export {
+  createRoom,
+  createRoomInvite,
+  deleteRoom,
+  renameRoom,
+  removeRoomMember,
+  getRoomMembers,
+  joinRoom,
+};
 
-export const createRoomInvite = onCall((request) =>
-  createRoomInviteHandler(request),
-);
-
-export const deleteRoom = onCall((request) => deleteRoomHandler(request));
-
-export const renameRoom = onCall((request) => renameRoomHandler(request));
-
-export const removeRoomMember = onCall((request) =>
-  removeRoomMemberHandler(request),
-);
-
-export const getRoomMembers = onCall((request) =>
-  getRoomMembersHandler(request),
-);
-
-export const joinRoom = onCall((request) => joinRoomHandler(request));
-
-export { createExpense, deleteExpense, rebuildExpenseSummaries, updateExpense };
+// expense functions
+export {
+  createExpense,
+  deleteExpense,
+  rebuildExpenseSummaries,
+  updateExpense,
+};
