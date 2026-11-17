@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_together/features/expenses/data/expense_dto.dart';
 import 'package:pocket_together/features/expenses/models/expense.dart';
 
 void main() {
@@ -17,7 +18,7 @@ void main() {
       updatedAt: createdAt,
     );
 
-    final decoded = Expense.fromMap(expense.id, expense.toMap());
+    final decoded = ExpenseDto.fromMap(expense.id, ExpenseDto.toMap(expense));
 
     expect(decoded.amountInCents, 1001);
     expect(decoded.note, 'Lunch');
@@ -42,7 +43,7 @@ void main() {
 
   test('returns null for malformed or fractional Firestore data', () {
     expect(
-      Expense.tryFromMap('expense-2', {
+      ExpenseDto.tryFromMap('expense-2', {
         'amountInCents': 1000.5,
         'category': 'Food',
         'paidByUserId': 'user-1',
@@ -53,7 +54,7 @@ void main() {
       isNull,
     );
     expect(
-      Expense.tryFromMap('expense-3', {
+      ExpenseDto.tryFromMap('expense-3', {
         'amountInCents': 1000,
         'category': 'Food',
         'paidByUserId': 'user-1',

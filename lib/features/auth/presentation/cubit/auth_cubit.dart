@@ -1,13 +1,9 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/auth_repository.dart' as auth_data;
-import '../../data/firebase_auth_repository.dart';
 import '../../../profile/data/profile_repository.dart';
-import '../../../profile/data/firebase_profile_repository.dart';
 import 'auth_state.dart';
 
 /// Coordinates authentication actions and profile validation for the app.
@@ -16,38 +12,15 @@ import 'auth_state.dart';
 /// coalesces duplicate startup checks. Repository and Firestore authorization
 /// remain separate concerns owned by their respective data layers.
 class AuthCubit extends Cubit<AuthState> {
-  AuthCubit({
-    FirebaseAuth? firebaseAuth,
-    auth_data.AuthRepository? authRepository,
-    ProfileRepository? profileRepository,
-  }) : _firebaseAuth =
-           firebaseAuth ??
-           (authRepository == null ? FirebaseAuth.instance : null),
-       _authRepository =
-           authRepository ??
-           FirebaseAuthRepository(firebaseAuth ?? FirebaseAuth.instance),
-       _profileRepository =
-           profileRepository ??
-           FirebaseProfileRepository(FirebaseFirestore.instance),
-       super(const AuthInitial()) {
-    final auth = _firebaseAuth;
-    if (auth != null) {
-      _firebaseAuthSubscription = auth.authStateChanges().listen((_) {
-        if (!_isPerformingAction) initialize(force: true);
-      });
-    } else {
-      _authRepositorySubscription = _authRepository.authStateChanges.listen((
-        _,
-      ) {
-        if (!_isPerformingAction) initialize(force: true);
-      });
-    }
+  AuthCubit({required this._authRepository, required this._profileRepository})
+    : super(const AuthInitial()) {
+    _authRepositorySubscription = _authRepository.authStateChanges.listen((_) {
+      if (!_isPerformingAction) initialize(force: true);
+    });
   }
 
   final auth_data.AuthRepository _authRepository;
   final ProfileRepository _profileRepository;
-  final FirebaseAuth? _firebaseAuth;
-  StreamSubscription<User?>? _firebaseAuthSubscription;
   StreamSubscription<bool>? _authRepositorySubscription;
   Future<void>? _validationRequest;
   bool _isPerformingAction = false;
@@ -113,7 +86,6 @@ class AuthCubit extends Cubit<AuthState> {
 
   @override
   Future<void> close() async {
-    await _firebaseAuthSubscription?.cancel();
     await _authRepositorySubscription?.cancel();
     return super.close();
   }
@@ -151,12 +123,7 @@ class AuthCubit extends Cubit<AuthState> {
       if (profile == null) {
         try {
           await _ensureProfileExists();
-          final firebaseUser = _firebaseAuth?.currentUser;
-          if (firebaseUser != null) {
-            emit(Authenticated(firebaseUser));
-          } else {
-            emit(AuthenticatedSession(currentUser));
-          }
+          emit(Authenticated(currentUser));
         } catch (_) {
           emit(
             const AuthValidationError(
@@ -167,12 +134,7 @@ class AuthCubit extends Cubit<AuthState> {
         return;
       }
 
-      final firebaseUser = _firebaseAuth?.currentUser;
-      if (firebaseUser != null) {
-        emit(Authenticated(firebaseUser));
-      } else {
-        emit(AuthenticatedSession(currentUser));
-      }
+      emit(Authenticated(currentUser));
     } on ProfileFailure catch (error) {
       emit(AuthValidationError(message: error.message));
     } catch (_) {

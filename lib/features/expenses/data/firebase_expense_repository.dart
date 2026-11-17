@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import 'expense_dto.dart';
 import '../models/expense.dart';
 import 'expense_repository.dart';
 
@@ -32,7 +33,8 @@ class FirebaseExpenseRepository implements ExpenseRepository {
         .map(
           (snapshot) => snapshot.docs
               .map(
-                (document) => Expense.tryFromMap(document.id, document.data()),
+                (document) =>
+                    ExpenseDto.tryFromMap(document.id, document.data()),
               )
               .whereType<Expense>()
               .toList(),
@@ -58,7 +60,9 @@ class FirebaseExpenseRepository implements ExpenseRepository {
           .orderBy('expenseDate', descending: true)
           .get();
       return snapshot.docs
-          .map((document) => Expense.tryFromMap(document.id, document.data()))
+          .map(
+            (document) => ExpenseDto.tryFromMap(document.id, document.data()),
+          )
           .whereType<Expense>()
           .toList();
     } on FirebaseException {
@@ -154,7 +158,7 @@ class FirebaseExpenseRepository implements ExpenseRepository {
   }
 
   Map<String, dynamic> _callableData(Expense expense) {
-    final data = expense.toJson()..remove('id');
+    final data = ExpenseDto.toJson(expense)..remove('id');
     // Callable arguments must be JSON-compatible; generated DateTime values
     // are ISO strings and are parsed by the backend.
     return data;

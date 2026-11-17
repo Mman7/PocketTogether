@@ -1,5 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
-
 import '../../models/auth_user.dart';
 
 /// Base authentication view state consumed by routing and auth pages.
@@ -36,12 +34,6 @@ class AuthValidatingProfile extends AuthState {
 
 class Authenticated extends AuthState {
   const Authenticated(this.user) : super(isSuccess: true);
-
-  final User user;
-}
-
-class AuthenticatedSession extends AuthState {
-  const AuthenticatedSession(this.user) : super(isSuccess: true);
 
   final AuthUser user;
 }

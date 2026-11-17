@@ -5,7 +5,6 @@ import 'package:lottie/lottie.dart';
 import '../../../../app/theme/app_theme.dart';
 import '../../../../shared/presentation/category_emoji.dart';
 import '../../../../shared/presentation/money_format.dart';
-import '../../../../shared/presentation/short_date.dart';
 import '../../../../shared/presentation/widgets/flow_widgets.dart';
 import '../../../expenses/models/expense.dart';
 import '../../../expenses/presentation/cubit/expense_cubit.dart';

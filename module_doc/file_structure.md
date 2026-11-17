@@ -1,4 +1,5 @@
 # Flutter Finance App — Architecture
+<!-- FYI: cubit doesnt know the repo layer logic, it only call the method that repo provided -->
 
 ## Tech Stack
 

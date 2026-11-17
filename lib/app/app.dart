@@ -110,9 +110,6 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _authCubit = AuthCubit(
       authRepository: _authRepository,
       profileRepository: _profileRepository,
-      firebaseAuth: widget.authRepository == null
-          ? FirebaseAuth.instance
-          : null,
     );
 
     _authStateRefresh = _AuthStateRefresh(_authCubit);
@@ -136,7 +133,6 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         final authState = _authCubit.state;
         final isAuthenticated =
             authState is Authenticated ||
-            authState is AuthenticatedSession ||
             ((authState is AuthInitial || authState is AuthValidatingProfile) &&
                 _authRepository.isSignedIn);
         if (isAuthenticated && isAuthRoute) return '/rooms';
