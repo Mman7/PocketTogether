@@ -44,6 +44,8 @@ class PocketTogetherApp extends StatefulWidget {
     super.key,
   });
 
+  // Dependencies are optional so production can use Firebase defaults while
+  // tests can inject fake repositories without changing application code.
   final AuthRepository? authRepository;
   final ProfileRepository? profileRepository;
   final RoomRepository? roomRepository;

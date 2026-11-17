@@ -1,8 +1,7 @@
 /// A room expense represented entirely in integer cents.
 ///
-/// Split amounts must add up exactly to [amountInCents]. Dates are normalized
-/// to UTC at the Firestore boundary, while serialization continues to support
-/// the existing generated JSON representation.
+/// Split amounts must add up exactly to [amountInCents]. Persistence mapping
+/// and date normalization are handled by the data layer.
 class Expense {
   final String id;
   final int amountInCents;
