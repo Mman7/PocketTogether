@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_together/features/rooms/models/room_member.dart';
 import 'package:pocket_together/features/rooms/models/room_role.dart';

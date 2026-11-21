@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:material_ui/material_ui.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,13 +38,12 @@ Future<void> main() async {
   }
 
   final fcmService = FcmService();
-  await fcmService.initialize();
   final notificationHandler = NotificationHandler();
-
   runApp(
     PocketTogetherApp(
       functions: functions,
       notificationHandler: notificationHandler,
     ),
   );
+  unawaited(fcmService.initialize());
 }

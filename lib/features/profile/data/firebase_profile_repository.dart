@@ -1,14 +1,20 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/user.dart';
 import 'profile_repository.dart';
 
-/// Firestore-backed access to the authenticated user's profile document.
+/// Firestore adapter for `users/{uid}` profile documents.
 ///
-/// Profile creation is idempotent at the application level: an existing
-/// document is preserved while missing profiles receive the initial fields.
+/// Every request is bounded by [_requestTimeout] and Firestore errors are
+/// translated into [ProfileFailure] so callers never hang on an unreachable
+/// backend.
 class FirebaseProfileRepository implements ProfileRepository {
   FirebaseProfileRepository(this._firestore);
+
+  static const _requestTimeout = Duration(seconds: 15);
 
   final FirebaseFirestore _firestore;
 
@@ -20,73 +26,83 @@ class FirebaseProfileRepository implements ProfileRepository {
     required String uid,
     required String displayName,
     required String email,
-  }) async {
-    try {
-      await _users.doc(uid).set(_newProfileData(displayName, email));
-    } on FirebaseException {
-      throw const ProfileFailure('Unable to save your profile. Try again.');
-    }
-  }
+  }) => _run(
+    'create profile',
+    () => _users.doc(uid).set(_newProfileData(displayName, email)),
+  );
 
   @override
   Future<void> ensureProfileExists({
     required String uid,
     required String displayName,
     required String email,
-  }) async {
-    // A server read avoids treating stale local cache data as proof that the
-    // profile exists during authentication recovery.
-    try {
-      final document = _users.doc(uid);
-      final snapshot = await document.get(GetOptions(source: Source.server));
-      if (!snapshot.exists) {
-        await document.set(_newProfileData(displayName, email));
-      } else if (snapshot.data()?['email'] != email.trim()) {
-        await document.set({'email': email.trim()}, SetOptions(merge: true));
-      }
-    } on FirebaseException {
-      throw const ProfileFailure('Unable to load your profile. Try again.');
+  }) => _run('ensure profile', () async {
+    final document = _users.doc(uid);
+    // Server read: cached data must not prove the profile exists during recovery.
+    final snapshot = await document.get(GetOptions(source: Source.server));
+    if (!snapshot.exists) {
+      await document.set(_newProfileData(displayName, email));
+      return;
     }
-  }
+
+    final trimmedEmail = email.trim();
+    if (trimmedEmail.isNotEmpty && snapshot.data()?['email'] != trimmedEmail) {
+      await document.set({'email': trimmedEmail}, SetOptions(merge: true));
+    }
+  });
 
   @override
-  Future<UserProfile?> getProfile(String uid) async {
-    try {
-      final snapshot = await _users.doc(uid).get();
-      final data = snapshot.data();
-      if (data == null) return null;
+  Future<UserProfile?> getProfile(String uid) => _run('load profile', () async {
+    final snapshot = await _users.doc(uid).get();
+    final data = snapshot.data();
+    if (data == null) return null;
 
-      final createdAt = data['createdAt'];
-      return UserProfile(
-        uid: uid,
-        displayName: data['displayName'] is String
-            ? data['displayName'] as String
-            : '',
-        email: data['email'] is String ? data['email'] as String : null,
-        createdAt: _dateValue(createdAt),
-      );
-    } on FirebaseException {
-      throw const ProfileFailure('Unable to load your profile. Try again.');
-    }
-  }
+    return UserProfile(
+      uid: uid,
+      displayName: _string(data['displayName']) ?? '',
+      email: _string(data['email']),
+      createdAt: _dateValue(data['createdAt']),
+      updatedAt: _dateValue(data['updatedAt']),
+    );
+  });
 
   @override
   Future<void> updateDisplayName({
     required String uid,
     required String displayName,
-  }) async {
+  }) => _run(
+    'update display name',
+    () => _users.doc(uid).update({'displayName': displayName.trim()}),
+  );
+
+  Future<T> _run<T>(String operation, Future<T> Function() request) async {
     try {
-      await _users.doc(uid).update({'displayName': displayName.trim()});
-    } on FirebaseException {
-      throw const ProfileFailure('Unable to update your profile. Try again.');
+      return await request().timeout(_requestTimeout);
+    } on TimeoutException {
+      debugPrint('[Profile] $operation timed out.');
+      throw const ProfileFailure(
+        'Profile request timed out. Check your connection and try again.',
+      );
+    } on FirebaseException catch (error) {
+      debugPrint('[Profile] $operation failed: code=${error.code}');
+      throw ProfileFailure(_messageFor(error));
     }
   }
+
+  String _messageFor(FirebaseException error) => switch (error.code) {
+    'permission-denied' => 'You do not have access to this profile.',
+    'unavailable' ||
+    'deadline-exceeded' => 'Check your connection and try again.',
+    _ => 'Unable to save or load your profile. Try again.',
+  };
 
   Map<String, Object?> _newProfileData(String displayName, String email) => {
     'displayName': displayName.trim(),
     'email': email.trim(),
     'createdAt': FieldValue.serverTimestamp(),
   };
+
+  String? _string(Object? value) => value is String ? value : null;
 }
 
 DateTime? _dateValue(Object? value) {

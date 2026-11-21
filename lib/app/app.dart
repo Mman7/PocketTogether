@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,8 +44,6 @@ class PocketTogetherApp extends StatefulWidget {
     super.key,
   });
 
-  // Dependencies are optional so production can use Firebase defaults while
-  // tests can inject fake repositories without changing application code.
   final AuthRepository? authRepository;
   final ProfileRepository? profileRepository;
   final RoomRepository? roomRepository;
@@ -112,6 +110,9 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
     _authCubit = AuthCubit(
       authRepository: _authRepository,
       profileRepository: _profileRepository,
+      firebaseAuth: widget.authRepository == null
+          ? FirebaseAuth.instance
+          : null,
     );
 
     _authStateRefresh = _AuthStateRefresh(_authCubit);
@@ -135,6 +136,7 @@ class _PocketTogetherAppState extends State<PocketTogetherApp> {
         final authState = _authCubit.state;
         final isAuthenticated =
             authState is Authenticated ||
+            authState is AuthenticatedSession ||
             ((authState is AuthInitial || authState is AuthValidatingProfile) &&
                 _authRepository.isSignedIn);
         if (isAuthenticated && isAuthRoute) return '/rooms';

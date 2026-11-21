@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/profile_repository.dart';
@@ -12,14 +13,16 @@ class ProfileCubit extends Cubit<ProfileState> {
   Future<void> load(String? uid) async {
     if (uid == null || uid.isEmpty) return;
 
-    emit(const ProfileState(isLoading: true));
+    _emit(const ProfileState(isLoading: true));
     try {
       final profile = await _repository.getProfile(uid);
-      emit(ProfileState(profile: profile));
+      _emit(ProfileState(profile: profile));
     } on ProfileFailure catch (error) {
-      emit(ProfileState(errorMessage: error.message));
-    } catch (_) {
-      emit(const ProfileState(errorMessage: 'Unable to load your profile.'));
+      _emit(ProfileState(errorMessage: error.message));
+    } catch (error, stackTrace) {
+      debugPrint('[Profile] Unexpected load error: $error');
+      debugPrintStack(stackTrace: stackTrace, label: '[Profile]');
+      _emit(const ProfileState(errorMessage: 'Unable to load your profile.'));
     }
   }
 
@@ -30,17 +33,22 @@ class ProfileCubit extends Cubit<ProfileState> {
     final name = displayName.trim();
     await _repository.updateDisplayName(uid: uid, displayName: name);
 
-    final profile = state.profile;
-    emit(
+    final current = state.profile;
+    _emit(
       ProfileState(
         profile: UserProfile(
           uid: uid,
           displayName: name,
-          email: profile?.email,
-          createdAt: profile?.createdAt,
-          updatedAt: profile?.updatedAt,
+          email: current?.email,
+          createdAt: current?.createdAt,
+          updatedAt: current?.updatedAt,
         ),
       ),
     );
+  }
+
+  /// Guards against emitting after close, which throws a StateError.
+  void _emit(ProfileState next) {
+    if (!isClosed) emit(next);
   }
 }

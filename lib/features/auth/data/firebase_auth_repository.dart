@@ -6,13 +6,15 @@ import 'auth_repository.dart';
 
 /// Firebase Authentication adapter used by the auth Cubit.
 ///
-/// This class translates provider-specific failures into stable user-facing
-/// [AuthFailure] messages; it does not decide whether a Firestore profile is
-/// valid or whether a room operation is authorized.
+/// Translates provider-specific failures into [AuthFailure] messages. It does
+/// not decide whether a Firestore profile is valid or whether a room operation
+/// is authorized.
 class FirebaseAuthRepository implements AuthRepository {
-  FirebaseAuthRepository(this._firebaseAuth);
+  FirebaseAuthRepository(this._firebaseAuth, {GoogleSignIn? googleSignIn})
+    : _googleSignIn = googleSignIn ?? GoogleSignIn();
 
   final FirebaseAuth _firebaseAuth;
+  final GoogleSignIn _googleSignIn;
 
   @override
   bool get isSignedIn => _firebaseAuth.currentUser != null;
@@ -34,33 +36,29 @@ class FirebaseAuthRepository implements AuthRepository {
       _firebaseAuth.authStateChanges().map((user) => user != null).distinct();
 
   @override
-  Future<void> signIn({required String email, required String password}) async {
-    try {
-      await _firebaseAuth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
-    } on FirebaseAuthException catch (error) {
-      throw AuthFailure(_messageFor(error));
-    }
-  }
+  Future<void> signIn({required String email, required String password}) =>
+      _run(() async {
+        await _firebaseAuth.signInWithEmailAndPassword(
+          email: email.trim(),
+          password: password,
+        );
+      });
 
   @override
-  Future<void> signInWithGoogle() async {
-    try {
-      final googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
-
-      final googleAuthentication = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuthentication.accessToken,
-        idToken: googleAuthentication.idToken,
-      );
-      await _firebaseAuth.signInWithCredential(credential);
-    } on FirebaseAuthException catch (error) {
-      throw AuthFailure(_messageFor(error));
+  Future<void> signInWithGoogle() => _run(() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      return;
     }
-  }
+
+    final authentication = await googleUser.authentication;
+    await _firebaseAuth.signInWithCredential(
+      GoogleAuthProvider.credential(
+        accessToken: authentication.accessToken,
+        idToken: authentication.idToken,
+      ),
+    );
+  });
 
   @override
   Future<void> register({
@@ -69,16 +67,22 @@ class FirebaseAuthRepository implements AuthRepository {
     required String password,
   }) async {
     try {
-      // Create a new user with the provided email and password.
       final credential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-      final user = credential.user!;
-      // Update the display name for the newly created user.
+
+      final user = credential.user;
+      if (user == null) {
+        throw const AuthFailure(
+          'Account created, but the user session is unavailable.',
+        );
+      }
       await user.updateDisplayName(displayName.trim());
     } on FirebaseAuthException catch (error) {
       throw AuthFailure(_messageFor(error));
+    } catch (error) {
+      rethrow;
     }
   }
 
@@ -87,7 +91,8 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
     } on FirebaseAuthException catch (error) {
-      // Do not reveal whether an email is registered through this endpoint.
+      // Unknown accounts are reported as success so the endpoint does not
+      // reveal which emails are registered.
       if (error.code == 'user-not-found') return;
       throw AuthFailure(_messageFor(error));
     }
@@ -95,6 +100,14 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> signOut() => _firebaseAuth.signOut();
+
+  Future<T> _run<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on FirebaseAuthException catch (error) {
+      throw AuthFailure(_messageFor(error));
+    }
+  }
 
   String _messageFor(FirebaseAuthException error) => switch (error.code) {
     'invalid-email' => 'Enter a valid email address.',

@@ -1,9 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../../models/auth_user.dart';
 
 /// Base authentication view state consumed by routing and auth pages.
 ///
-/// Authenticated state carries the platform-neutral user model supplied by the
-/// repository, keeping presentation code independent of the auth provider.
+/// Authenticated variants carry either the Firebase user or the repository's
+/// platform-neutral user model, allowing tests to avoid a Firebase instance.
 class AuthState {
   const AuthState({
     this.errorMessage,
@@ -34,6 +36,12 @@ class AuthValidatingProfile extends AuthState {
 
 class Authenticated extends AuthState {
   const Authenticated(this.user) : super(isSuccess: true);
+
+  final User user;
+}
+
+class AuthenticatedSession extends AuthState {
+  const AuthenticatedSession(this.user) : super(isSuccess: true);
 
   final AuthUser user;
 }

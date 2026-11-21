@@ -1,4 +1,4 @@
-package com.example.pockettogether
+package com.example.ffta
 
 import io.flutter.embedding.android.FlutterActivity
 
